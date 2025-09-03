@@ -10,6 +10,10 @@ public class Tenant
     [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
     
+    [Required]
+    [MaxLength(255)]
+    public string Email { get; set; } = string.Empty;
+    
     [MaxLength(500)]
     public string? Description { get; set; }
     
@@ -22,6 +26,10 @@ public class Tenant
     public int UserLimit { get; set; } = 10;
     public long StorageLimit { get; set; } = 1073741824; // 1GB in bytes
     public int ApiCallsLimit { get; set; } = 10000;
+    
+    // Current usage tracking
+    public long CurrentStorage { get; set; } = 0;
+    public int CurrentApiCalls { get; set; } = 0;
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

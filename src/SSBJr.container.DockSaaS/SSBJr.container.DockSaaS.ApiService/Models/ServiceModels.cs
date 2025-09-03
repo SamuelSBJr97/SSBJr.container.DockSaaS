@@ -64,6 +64,7 @@ public class ServiceInstance
     
     // Navigation properties
     public virtual ICollection<ServiceMetric> Metrics { get; set; } = new List<ServiceMetric>();
+    public virtual ICollection<ServiceMetric> ServiceMetrics { get; set; } = new List<ServiceMetric>();
 }
 
 public class ServiceMetric

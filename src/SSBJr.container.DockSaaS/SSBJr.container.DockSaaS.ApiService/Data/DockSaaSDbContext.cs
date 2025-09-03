@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SSBJr.container.DockSaaS.ApiService.Models;
@@ -11,255 +10,324 @@ public class DockSaaSDbContext : IdentityDbContext<User, Role, Guid>
     {
     }
 
+    // Existing DbSets
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<ServiceDefinition> ServiceDefinitions { get; set; }
     public DbSet<ServiceInstance> ServiceInstances { get; set; }
     public DbSet<ServiceMetric> ServiceMetrics { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
 
+    // New DbSets for enhanced functionality
+    public DbSet<UsageRecord> UsageRecords { get; set; }
+    public DbSet<BillingAlert> BillingAlerts { get; set; }
+    public DbSet<ServiceTemplate> ServiceTemplates { get; set; }
+    public DbSet<ApiKey> ApiKeys { get; set; }
+    public DbSet<Models.Notification> Notifications { get; set; }
+    public DbSet<ServiceBackup> ServiceBackups { get; set; }
+    public DbSet<TenantSettings> TenantSettings { get; set; }
+    public DbSet<ServiceEvent> ServiceEvents { get; set; }
+    public DbSet<TenantInvitation> TenantInvitations { get; set; }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
-        // Configure Tenant
-        builder.Entity<Tenant>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Name).IsUnique();
-            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Plan).HasDefaultValue("Free");
-            entity.Property(e => e.UserLimit).HasDefaultValue(10);
-            entity.Property(e => e.StorageLimit).HasDefaultValue(1073741824L);
-            entity.Property(e => e.ApiCallsLimit).HasDefaultValue(10000);
-        });
-
-        // Configure User
+        // Configure User entity
         builder.Entity<User>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.Email, e.TenantId }).IsUnique();
-            entity.Property(e => e.FirstName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.LastName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.FirstName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Email).HasMaxLength(255).IsRequired();
+            entity.HasIndex(e => e.Email).IsUnique();
             
+            // User-Tenant relationship
             entity.HasOne(e => e.Tenant)
                   .WithMany(t => t.Users)
                   .HasForeignKey(e => e.TenantId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Configure ServiceDefinition
+        // Configure Role entity
+        builder.Entity<Role>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+        });
+
+        // Configure Tenant entity
+        builder.Entity<Tenant>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Email).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Plan).HasMaxLength(50).HasDefaultValue("Free");
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => e.Email).IsUnique();
+        });
+
+        // Configure ServiceDefinition entity
         builder.Entity<ServiceDefinition>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.Name).IsUnique();
-            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Type).IsRequired().HasMaxLength(50);
-            entity.Property(e => e.ConfigurationSchema).HasColumnType("jsonb");
-            entity.Property(e => e.DefaultConfiguration).HasColumnType("jsonb");
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Type).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.ConfigurationSchema).HasColumnType("text");
+            entity.Property(e => e.DefaultConfiguration).HasColumnType("text");
+            entity.HasIndex(e => e.Type).IsUnique();
         });
 
-        // Configure ServiceInstance
+        // Configure ServiceInstance entity
         builder.Entity<ServiceInstance>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.Name, e.TenantId }).IsUnique();
-            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Configuration).HasColumnType("jsonb");
-            entity.Property(e => e.Status).HasDefaultValue("Created");
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Created");
+            entity.Property(e => e.Configuration).HasColumnType("text");
+            entity.Property(e => e.EndpointUrl).HasMaxLength(500);
+            entity.Property(e => e.ApiKey).HasMaxLength(500);
             
-            entity.HasOne(e => e.ServiceDefinition)
-                  .WithMany(sd => sd.ServiceInstances)
-                  .HasForeignKey(e => e.ServiceDefinitionId)
-                  .OnDelete(DeleteBehavior.Cascade);
-            
+            // ServiceInstance-Tenant relationship
             entity.HasOne(e => e.Tenant)
                   .WithMany(t => t.ServiceInstances)
                   .HasForeignKey(e => e.TenantId)
                   .OnDelete(DeleteBehavior.Cascade);
+                  
+            // ServiceInstance-ServiceDefinition relationship
+            entity.HasOne(e => e.ServiceDefinition)
+                  .WithMany()
+                  .HasForeignKey(e => e.ServiceDefinitionId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.TenantId, e.Name }).IsUnique();
         });
 
-        // Configure ServiceMetric
+        // Configure ServiceMetric entity
         builder.Entity<ServiceMetric>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.ServiceInstanceId, e.MetricName, e.Timestamp });
-            entity.Property(e => e.MetricName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Tags).HasColumnType("jsonb");
+            entity.Property(e => e.MetricName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Unit).HasMaxLength(50);
+            entity.Property(e => e.Tags).HasColumnType("text");
             
+            // ServiceMetric-ServiceInstance relationship
             entity.HasOne(e => e.ServiceInstance)
-                  .WithMany(si => si.Metrics)
+                  .WithMany(s => s.ServiceMetrics)
                   .HasForeignKey(e => e.ServiceInstanceId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ServiceInstanceId, e.Timestamp, e.MetricName });
         });
 
-        // Configure AuditLog
+        // Configure AuditLog entity
         builder.Entity<AuditLog>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.TenantId, e.Timestamp });
-            entity.HasIndex(e => new { e.UserId, e.Timestamp });
-            entity.Property(e => e.Action).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.EntityType).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.OldValues).HasColumnType("jsonb");
-            entity.Property(e => e.NewValues).HasColumnType("jsonb");
-            entity.Property(e => e.Level).HasDefaultValue("Info");
+            entity.Property(e => e.Action).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.EntityType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.OldValues).HasColumnType("text");
+            entity.Property(e => e.NewValues).HasColumnType("text");
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.Property(e => e.UserAgent).HasMaxLength(500);
+            entity.Property(e => e.Level).HasMaxLength(50).HasDefaultValue("Info");
             
-            entity.HasOne(e => e.User)
-                  .WithMany(u => u.AuditLogs)
-                  .HasForeignKey(e => e.UserId)
-                  .OnDelete(DeleteBehavior.SetNull);
-            
+            // AuditLog-Tenant relationship
             entity.HasOne(e => e.Tenant)
-                  .WithMany(t => t.AuditLogs)
+                  .WithMany()
                   .HasForeignKey(e => e.TenantId)
                   .OnDelete(DeleteBehavior.Cascade);
+                  
+            // AuditLog-User relationship (optional)
+            entity.HasOne<User>()
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => new { e.TenantId, e.Timestamp });
+            entity.HasIndex(e => e.EntityType);
         });
 
-        // Seed default service definitions
-        SeedServiceDefinitions(builder);
-    }
-
-    private void SeedServiceDefinitions(ModelBuilder builder)
-    {
-        var serviceDefinitions = new[]
+        // Configure UsageRecord entity
+        builder.Entity<UsageRecord>(entity =>
         {
-            new ServiceDefinition
-            {
-                Id = new Guid("11111111-1111-1111-1111-111111111111"),
-                Name = "S3-like Storage",
-                Type = "S3Storage",
-                Description = "Object storage service similar to AWS S3",
-                IconUrl = "/icons/storage.svg",
-                ConfigurationSchema = """
-                {
-                    "type": "object",
-                    "properties": {
-                        "bucketName": {"type": "string", "required": true},
-                        "region": {"type": "string", "default": "us-east-1"},
-                        "encryption": {"type": "boolean", "default": false},
-                        "versioning": {"type": "boolean", "default": false}
-                    }
-                }
-                """,
-                DefaultConfiguration = """
-                {
-                    "bucketName": "",
-                    "region": "us-east-1",
-                    "encryption": false,
-                    "versioning": false
-                }
-                """
-            },
-            new ServiceDefinition
-            {
-                Id = new Guid("22222222-2222-2222-2222-222222222222"),
-                Name = "RDS-like Database",
-                Type = "RDSDatabase",
-                Description = "Relational database service similar to AWS RDS",
-                IconUrl = "/icons/database.svg",
-                ConfigurationSchema = """
-                {
-                    "type": "object",
-                    "properties": {
-                        "engine": {"type": "string", "enum": ["postgresql", "mysql", "sqlserver"], "default": "postgresql"},
-                        "instanceClass": {"type": "string", "default": "db.t3.micro"},
-                        "allocatedStorage": {"type": "integer", "default": 20},
-                        "multiAZ": {"type": "boolean", "default": false}
-                    }
-                }
-                """,
-                DefaultConfiguration = """
-                {
-                    "engine": "postgresql",
-                    "instanceClass": "db.t3.micro",
-                    "allocatedStorage": 20,
-                    "multiAZ": false
-                }
-                """
-            },
-            new ServiceDefinition
-            {
-                Id = new Guid("33333333-3333-3333-3333-333333333333"),
-                Name = "DynamoDB-like NoSQL",
-                Type = "NoSQLDatabase",
-                Description = "NoSQL database service similar to AWS DynamoDB",
-                IconUrl = "/icons/nosql.svg",
-                ConfigurationSchema = """
-                {
-                    "type": "object",
-                    "properties": {
-                        "tableName": {"type": "string", "required": true},
-                        "billingMode": {"type": "string", "enum": ["PROVISIONED", "PAY_PER_REQUEST"], "default": "PAY_PER_REQUEST"},
-                        "readCapacity": {"type": "integer", "default": 5},
-                        "writeCapacity": {"type": "integer", "default": 5}
-                    }
-                }
-                """,
-                DefaultConfiguration = """
-                {
-                    "tableName": "",
-                    "billingMode": "PAY_PER_REQUEST",
-                    "readCapacity": 5,
-                    "writeCapacity": 5
-                }
-                """
-            },
-            new ServiceDefinition
-            {
-                Id = new Guid("44444444-4444-4444-4444-444444444444"),
-                Name = "SQS-like Queue",
-                Type = "Queue",
-                Description = "Message queue service similar to AWS SQS",
-                IconUrl = "/icons/queue.svg",
-                ConfigurationSchema = """
-                {
-                    "type": "object",
-                    "properties": {
-                        "queueName": {"type": "string", "required": true},
-                        "visibilityTimeout": {"type": "integer", "default": 30},
-                        "messageRetention": {"type": "integer", "default": 1209600},
-                        "delaySeconds": {"type": "integer", "default": 0}
-                    }
-                }
-                """,
-                DefaultConfiguration = """
-                {
-                    "queueName": "",
-                    "visibilityTimeout": 30,
-                    "messageRetention": 1209600,
-                    "delaySeconds": 0
-                }
-                """
-            },
-            new ServiceDefinition
-            {
-                Id = new Guid("55555555-5555-5555-5555-555555555555"),
-                Name = "Lambda-like Functions",
-                Type = "Function",
-                Description = "Serverless function service similar to AWS Lambda",
-                IconUrl = "/icons/function.svg",
-                ConfigurationSchema = """
-                {
-                    "type": "object",
-                    "properties": {
-                        "functionName": {"type": "string", "required": true},
-                        "runtime": {"type": "string", "enum": ["dotnet8", "node18", "python3.9"], "default": "dotnet8"},
-                        "timeout": {"type": "integer", "default": 30},
-                        "memory": {"type": "integer", "default": 128}
-                    }
-                }
-                """,
-                DefaultConfiguration = """
-                {
-                    "functionName": "",
-                    "runtime": "dotnet8",
-                    "timeout": 30,
-                    "memory": 128
-                }
-                """
-            }
-        };
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.MetricType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Metadata).HasColumnType("text");
 
-        builder.Entity<ServiceDefinition>().HasData(serviceDefinitions);
+            entity.HasOne(e => e.Tenant)
+                  .WithMany()
+                  .HasForeignKey(e => e.TenantId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.ServiceInstance)
+                  .WithMany()
+                  .HasForeignKey(e => e.ServiceInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TenantId, e.Timestamp, e.MetricType });
+        });
+
+        // Configure BillingAlert entity
+        builder.Entity<BillingAlert>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.MetricType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.AlertLevel).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Message).HasMaxLength(1000).IsRequired();
+
+            entity.HasOne(e => e.Tenant)
+                  .WithMany()
+                  .HasForeignKey(e => e.TenantId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TenantId, e.IsActive });
+        });
+
+        // Configure ServiceTemplate entity
+        builder.Entity<ServiceTemplate>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.ServiceType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.ConfigurationTemplate).HasColumnType("text");
+            entity.Property(e => e.DefaultValues).HasColumnType("text");
+            entity.Property(e => e.RequiredPlan).HasMaxLength(50).HasDefaultValue("Free");
+            entity.Property(e => e.IconUrl).HasMaxLength(500);
+            entity.Property(e => e.Category).HasMaxLength(100);
+            entity.Property(e => e.Tags).HasMaxLength(500);
+        });
+
+        // Configure ApiKey entity
+        builder.Entity<ApiKey>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.KeyHash).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.KeyPrefix).HasMaxLength(10).IsRequired();
+            entity.Property(e => e.Scopes).HasConversion(
+                v => string.Join(',', v),
+                v => v.Split(',', StringSplitOptions.RemoveEmptyEntries));
+            entity.Property(e => e.IpWhitelist).HasMaxLength(1000);
+
+            entity.HasOne(e => e.Tenant)
+                  .WithMany()
+                  .HasForeignKey(e => e.TenantId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.ServiceInstance)
+                  .WithMany()
+                  .HasForeignKey(e => e.ServiceInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.KeyHash).IsUnique();
+            entity.HasIndex(e => new { e.TenantId, e.IsActive });
+        });
+
+        // Configure Notification entity
+        builder.Entity<Models.Notification>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Type).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Channel).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Subject).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Content).HasColumnType("text");
+            entity.Property(e => e.Priority).HasMaxLength(20).HasDefaultValue("normal");
+            entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("pending");
+            entity.Property(e => e.ErrorMessage).HasMaxLength(1000);
+            entity.Property(e => e.Metadata).HasColumnType("text");
+
+            entity.HasOne(e => e.Tenant)
+                  .WithMany()
+                  .HasForeignKey(e => e.TenantId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(e => new { e.Status, e.CreatedAt });
+        });
+
+        // Configure ServiceBackup entity
+        builder.Entity<ServiceBackup>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.BackupType).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.StorageLocation).HasMaxLength(1000).IsRequired();
+            entity.Property(e => e.ErrorMessage).HasMaxLength(1000);
+            entity.Property(e => e.Metadata).HasColumnType("text");
+
+            entity.HasOne(e => e.ServiceInstance)
+                  .WithMany()
+                  .HasForeignKey(e => e.ServiceInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ServiceInstanceId, e.CreatedAt });
+        });
+
+        // Configure TenantSettings entity
+        builder.Entity<TenantSettings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.SettingKey).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.SettingValue).HasColumnType("text").IsRequired();
+            entity.Property(e => e.DataType).HasMaxLength(20).HasDefaultValue("string");
+            entity.Property(e => e.Description).HasMaxLength(500);
+
+            entity.HasOne(e => e.Tenant)
+                  .WithMany()
+                  .HasForeignKey(e => e.TenantId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TenantId, e.SettingKey }).IsUnique();
+        });
+
+        // Configure ServiceEvent entity
+        builder.Entity<ServiceEvent>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.EventType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.EventData).HasColumnType("text");
+            entity.Property(e => e.Severity).HasMaxLength(20).HasDefaultValue("info");
+            entity.Property(e => e.ProcessingResult).HasMaxLength(1000);
+
+            entity.HasOne(e => e.ServiceInstance)
+                  .WithMany()
+                  .HasForeignKey(e => e.ServiceInstanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ServiceInstanceId, e.Timestamp });
+            entity.HasIndex(e => new { e.IsProcessed, e.Timestamp });
+        });
+
+        // Configure TenantInvitation entity
+        builder.Entity<TenantInvitation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Email).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Role).HasMaxLength(50).HasDefaultValue("User");
+            entity.Property(e => e.InvitationToken).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("pending");
+
+            entity.HasOne(e => e.Tenant)
+                  .WithMany()
+                  .HasForeignKey(e => e.TenantId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.InvitedByUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.InvitedByUserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => e.InvitationToken).IsUnique();
+            entity.HasIndex(e => new { e.Email, e.TenantId, e.Status });
+        });
     }
 }

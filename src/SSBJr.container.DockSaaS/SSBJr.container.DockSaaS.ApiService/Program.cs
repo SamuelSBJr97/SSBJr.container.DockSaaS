@@ -79,6 +79,19 @@ builder.Services.AddAuthorization(options =>
 // Register application services
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IServiceManager, ServiceManager>();
+builder.Services.AddScoped<IBillingService, BillingService>();
+builder.Services.AddScoped<IServiceProvisioningService, ServiceProvisioningService>();
+
+// Register service providers
+builder.Services.AddScoped<SSBJr.container.DockSaaS.ApiService.Services.IServiceProvider, S3StorageServiceProvider>();
+builder.Services.AddScoped<SSBJr.container.DockSaaS.ApiService.Services.IServiceProvider, RDSDatabaseServiceProvider>();
+builder.Services.AddScoped<SSBJr.container.DockSaaS.ApiService.Services.IServiceProvider, NoSQLDatabaseServiceProvider>();
+builder.Services.AddScoped<IServiceInstanceProviders, ServiceInstanceProviders>();
+
+// Configure background services for metrics collection
+builder.Services.AddHostedService<MetricsCollectionService>();
+builder.Services.AddHostedService<BillingProcessingService>();
+builder.Services.AddHostedService<NotificationService>();
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -101,11 +114,17 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "DockSaaS API",
         Version = "v1",
-        Description = "A SaaS platform for managing AWS-like services",
+        Description = "A comprehensive SaaS platform for managing AWS-like services with multi-tenant architecture, billing, and advanced monitoring capabilities.",
         Contact = new OpenApiContact
         {
             Name = "DockSaaS Team",
-            Email = "support@docksaas.com"
+            Email = "support@docksaas.com",
+            Url = new Uri("https://github.com/SamuelSBJr97/SSBJr.container.DockSaaS")
+        },
+        License = new OpenApiLicense
+        {
+            Name = "MIT License",
+            Url = new Uri("https://opensource.org/licenses/MIT")
         }
     });
 
@@ -133,6 +152,15 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+
+    // Add API Key authentication
+    c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    {
+        Description = "API Key authentication. Add 'X-API-Key' header with your API key.",
+        Name = "X-API-Key",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey
+    });
 });
 
 var app = builder.Build();
@@ -147,7 +175,14 @@ if (app.Environment.IsDevelopment())
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "DockSaaS API v1");
         c.RoutePrefix = "swagger";
+        c.DocumentTitle = "DockSaaS API Documentation";
+        c.DefaultModelsExpandDepth(-1); // Hide schemas section by default
     });
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
 }
 
 app.UseHttpsRedirection();
@@ -158,6 +193,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Add health checks
+app.MapHealthChecks("/health");
 
 // Ensure database is created and seeded
 await using (var scope = app.Services.CreateAsyncScope())
@@ -183,6 +221,12 @@ await using (var scope = app.Services.CreateAsyncScope())
             }
         }
 
+        // Seed service definitions
+        await SeedServiceDefinitionsAsync(context);
+
+        // Seed pricing plans
+        await SeedPricingPlansAsync(context);
+
         Log.Information("Database initialization completed successfully");
     }
     catch (Exception ex)
@@ -193,3 +237,135 @@ await using (var scope = app.Services.CreateAsyncScope())
 }
 
 app.Run();
+
+// Seeding methods
+static async Task SeedServiceDefinitionsAsync(DockSaaSDbContext context)
+{
+    if (!context.ServiceDefinitions.Any())
+    {
+        var serviceDefinitions = new[]
+        {
+            new ServiceDefinition
+            {
+                Id = Guid.NewGuid(),
+                Name = "S3-like Storage",
+                Type = "S3Storage",
+                Description = "Object storage service with buckets, versioning, and lifecycle management",
+                ConfigurationSchema = """
+                {
+                    "bucketName": { "type": "string", "required": true },
+                    "encryption": { "type": "boolean", "default": true },
+                    "versioning": { "type": "boolean", "default": false },
+                    "publicAccess": { "type": "boolean", "default": false }
+                }
+                """,
+                DefaultConfiguration = """
+                {
+                    "bucketName": "my-bucket",
+                    "encryption": true,
+                    "versioning": false,
+                    "publicAccess": false
+                }
+                """,
+                IsActive = true
+            },
+            new ServiceDefinition
+            {
+                Id = Guid.NewGuid(),
+                Name = "RDS-like Database",
+                Type = "RDSDatabase",
+                Description = "Managed relational database service with automatic backups",
+                ConfigurationSchema = """
+                {
+                    "engine": { "type": "string", "enum": ["postgresql", "mysql"], "default": "postgresql" },
+                    "version": { "type": "string", "default": "15.0" },
+                    "maxConnections": { "type": "integer", "default": 100 }
+                }
+                """,
+                DefaultConfiguration = """
+                {
+                    "engine": "postgresql",
+                    "version": "15.0",
+                    "maxConnections": 100
+                }
+                """,
+                IsActive = true
+            },
+            new ServiceDefinition
+            {
+                Id = Guid.NewGuid(),
+                Name = "DynamoDB-like NoSQL",
+                Type = "NoSQLDatabase",
+                Description = "NoSQL database service with flexible schema and scaling",
+                ConfigurationSchema = """
+                {
+                    "readCapacity": { "type": "integer", "default": 5 },
+                    "writeCapacity": { "type": "integer", "default": 5 },
+                    "encryption": { "type": "boolean", "default": true }
+                }
+                """,
+                DefaultConfiguration = """
+                {
+                    "readCapacity": 5,
+                    "writeCapacity": 5,
+                    "encryption": true
+                }
+                """,
+                IsActive = true
+            },
+            new ServiceDefinition
+            {
+                Id = Guid.NewGuid(),
+                Name = "SQS-like Queue",
+                Type = "Queue",
+                Description = "Message queuing service for decoupling applications",
+                ConfigurationSchema = """
+                {
+                    "queueType": { "type": "string", "enum": ["standard", "fifo"], "default": "standard" },
+                    "retentionPeriod": { "type": "integer", "default": 345600 },
+                    "maxReceiveCount": { "type": "integer", "default": 10 }
+                }
+                """,
+                DefaultConfiguration = """
+                {
+                    "queueType": "standard",
+                    "retentionPeriod": 345600,
+                    "maxReceiveCount": 10
+                }
+                """,
+                IsActive = true
+            },
+            new ServiceDefinition
+            {
+                Id = Guid.NewGuid(),
+                Name = "Lambda-like Functions",
+                Type = "Function",
+                Description = "Serverless compute service for running code without managing servers",
+                ConfigurationSchema = """
+                {
+                    "runtime": { "type": "string", "enum": ["dotnet8", "python3.9", "nodejs18"], "default": "dotnet8" },
+                    "timeout": { "type": "integer", "default": 30 },
+                    "memory": { "type": "integer", "default": 128 }
+                }
+                """,
+                DefaultConfiguration = """
+                {
+                    "runtime": "dotnet8",
+                    "timeout": 30,
+                    "memory": 128
+                }
+                """,
+                IsActive = true
+            }
+        };
+
+        context.ServiceDefinitions.AddRange(serviceDefinitions);
+        await context.SaveChangesAsync();
+    }
+}
+
+static async Task SeedPricingPlansAsync(DockSaaSDbContext context)
+{
+    // This would be implemented as needed for tenant plan configuration
+    await Task.CompletedTask;
+}
