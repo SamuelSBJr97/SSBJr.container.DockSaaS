@@ -1,0 +1,308 @@
+﻿@page "/"
+@attribute [Authorize]
+@inject IDashboardService DashboardService
+@inject IServiceInstanceService ServiceInstanceService
+@inject ISnackbar Snackbar
+
+<PageTitle>Dashboard - DockSaaS</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+
+@if (isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (dashboardStats != null)
+{
+    <MudGrid>
+        <!-- Stats Cards -->
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="Icons.Material.Filled.People" Color="Color.Primary" Size="Size.Large" Class="me-3" />
+                        <div>
+                            <MudText Typo="Typo.h4">@dashboardStats.TotalUsers</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Total Users</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="Icons.Material.Filled.CloudQueue" Color="Color.Success" Size="Size.Large" Class="me-3" />
+                        <div>
+                            <MudText Typo="Typo.h4">@dashboardStats.ActiveServices</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Active Services</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="Icons.Material.Filled.Storage" Color="Color.Warning" Size="Size.Large" Class="me-3" />
+                        <div>
+                            <MudText Typo="Typo.h4">@FormatBytes(dashboardStats.TotalStorage)</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Storage Used</MudText>
+                            <MudProgressLinear Color="Color.Warning" Value="dashboardStats.StorageUsagePercent" Class="mt-2" />
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="Icons.Material.Filled.Api" Color="Color.Info" Size="Size.Large" Class="me-3" />
+                        <div>
+                            <MudText Typo="Typo.h4">@dashboardStats.TotalApiCalls.ToString("N0")</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">API Calls</MudText>
+                            <MudProgressLinear Color="Color.Info" Value="dashboardStats.ApiCallsUsagePercent" Class="mt-2" />
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Services Overview -->
+        <MudItem xs="12" md="8">
+            <MudCard Elevation="4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Service Instances</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudButton Href="/services/create" 
+                                   Color="Color.Primary" 
+                                   Variant="Variant.Filled" 
+                                   StartIcon="Icons.Material.Filled.Add"
+                                   Size="Size.Small">
+                            Create Service
+                        </MudButton>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (serviceInstances.Any())
+                    {
+                        <MudTable Items="serviceInstances.Take(5)" Hover="true" Dense="true">
+                            <HeaderContent>
+                                <MudTh>Name</MudTh>
+                                <MudTh>Type</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Usage</MudTh>
+                                <MudTh>Actions</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Name">@context.Name</MudTd>
+                                <MudTd DataLabel="Type">
+                                    <MudChip Size="Size.Small" Color="Color.Default">@context.ServiceType</MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="Status">
+                                    <MudChip Size="Size.Small" 
+                                             Color="@GetStatusColor(context.Status)">
+                                        @context.Status
+                                    </MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="Usage">
+                                    @if (context.UsageQuota > 0)
+                                    {
+                                        var percentage = (double)context.CurrentUsage / context.UsageQuota * 100;
+                                        <MudProgressLinear Value="percentage" Color="Color.Primary" />
+                                        <MudText Typo="Typo.caption">@percentage.ToString("F1")%</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.caption">No limit</MudText>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Actions">
+                                    <MudButtonGroup Size="Size.Small">
+                                        @if (context.Status == "Stopped")
+                                        {
+                                            <MudIconButton Icon="Icons.Material.Filled.PlayArrow" 
+                                                           Color="Color.Success" 
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => StartService(context.Id))" />
+                                        }
+                                        else if (context.Status == "Running")
+                                        {
+                                            <MudIconButton Icon="Icons.Material.Filled.Stop" 
+                                                           Color="Color.Warning" 
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => StopService(context.Id))" />
+                                        }
+                                        <MudIconButton Icon="Icons.Material.Filled.Visibility" 
+                                                       Color="Color.Primary" 
+                                                       Size="Size.Small"
+                                                       Href="@($"/services/{context.Id}")" />
+                                    </MudButtonGroup>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        
+                        @if (serviceInstances.Count > 5)
+                        {
+                            <div class="mt-4 text-center">
+                                <MudButton Href="/services" Color="Color.Primary" Variant="Variant.Text">
+                                    View All Services (@serviceInstances.Count)
+                                </MudButton>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center pa-4">
+                            <MudIcon Icon="Icons.Material.Filled.CloudOff" Size="Size.Large" Color="Color.Secondary" />
+                            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No services yet</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Create your first service to get started</MudText>
+                            <MudButton Href="/services/create" 
+                                       Color="Color.Primary" 
+                                       Variant="Variant.Filled" 
+                                       Class="mt-3"
+                                       StartIcon="Icons.Material.Filled.Add">
+                                Create First Service
+                            </MudButton>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Recent Activities -->
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Recent Activities</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (recentActivities.Any())
+                    {
+                        <MudList Dense="true">
+                            @foreach (var activity in recentActivities.Take(8))
+                            {
+                                <MudListItem>
+                                    <div>
+                                        <MudText Typo="Typo.body2">@activity.Action</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @activity.UserName - @activity.Timestamp.ToString("MMM dd, HH:mm")
+                                        </MudText>
+                                    </div>
+                                </MudListItem>
+                                <MudDivider />
+                            }
+                        </MudList>
+                        
+                        <div class="mt-3 text-center">
+                            <MudButton Href="/logs" Color="Color.Primary" Variant="Variant.Text" Size="Size.Small">
+                                View All Activities
+                            </MudButton>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center pa-4">
+                            <MudIcon Icon="Icons.Material.Filled.History" Size="Size.Large" Color="Color.Secondary" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No activities yet</MudText>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool isLoading = true;
+    private DashboardStatsDto? dashboardStats;
+    private List<ServiceInstanceDto> serviceInstances = new();
+    private List<AuditLogDto> recentActivities = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        isLoading = true;
+        
+        try
+        {
+            // Load data sequentially to avoid null issues
+            dashboardStats = await DashboardService.GetDashboardStatsAsync();
+            serviceInstances = await ServiceInstanceService.GetServiceInstancesAsync();
+            recentActivities = await DashboardService.GetRecentActivitiesAsync(10);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load dashboard data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task StartService(Guid serviceId)
+    {
+        var result = await ServiceInstanceService.StartServiceInstanceAsync(serviceId);
+        if (result)
+        {
+            Snackbar.Add("Service started successfully", Severity.Success);
+            await LoadDashboardData();
+        }
+        else
+        {
+            Snackbar.Add("Failed to start service", Severity.Error);
+        }
+    }
+
+    private async Task StopService(Guid serviceId)
+    {
+        var result = await ServiceInstanceService.StopServiceInstanceAsync(serviceId);
+        if (result)
+        {
+            Snackbar.Add("Service stopped successfully", Severity.Success);
+            await LoadDashboardData();
+        }
+        else
+        {
+            Snackbar.Add("Failed to stop service", Severity.Error);
+        }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Running" => Color.Success,
+        "Stopped" => Color.Default,
+        "Error" => Color.Error,
+        "Created" => Color.Info,
+        _ => Color.Default
+    };
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

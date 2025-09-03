@@ -1,0 +1,218 @@
+@page "/logs"
+@attribute [Authorize]
+@inject IDashboardService DashboardService
+@inject ISnackbar Snackbar
+
+<PageTitle>Audit Logs - DockSaaS</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Audit Logs</MudText>
+
+<MudCard Elevation="4" Class="mb-4">
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value="selectedLevel" Label="Level" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("All")">All Levels</MudSelectItem>
+                    <MudSelectItem Value="@("Info")">Info</MudSelectItem>
+                    <MudSelectItem Value="@("Warning")">Warning</MudSelectItem>
+                    <MudSelectItem Value="@("Error")">Error</MudSelectItem>
+                    <MudSelectItem Value="@("Critical")">Critical</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value="selectedEntityType" Label="Entity Type" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("All")">All Types</MudSelectItem>
+                    <MudSelectItem Value="@("User")">User</MudSelectItem>
+                    <MudSelectItem Value="@("Service")">Service</MudSelectItem>
+                    <MudSelectItem Value="@("Tenant")">Tenant</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudDatePicker @bind-Date="fromDate" Label="From Date" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudDatePicker @bind-Date="toDate" Label="To Date" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+@if (isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+<MudCard Elevation="4">
+    <MudCardContent>
+        <MudTable Items="filteredLogs" 
+                  Hover="true" 
+                  Dense="true"
+                  FixedHeader="true"
+                  Height="600px">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Activity Log</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="searchString" 
+                              Placeholder="Search logs..." 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="Icons.Material.Filled.Search" 
+                              IconSize="Size.Medium" 
+                              Class="mt-0" />
+                <MudButton Color="Color.Primary" 
+                           Variant="Variant.Text" 
+                           StartIcon="Icons.Material.Filled.Refresh"
+                           OnClick="LoadLogs"
+                           Class="ml-2">
+                    Refresh
+                </MudButton>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Time</MudTh>
+                <MudTh>Level</MudTh>
+                <MudTh>User</MudTh>
+                <MudTh>Action</MudTh>
+                <MudTh>Entity</MudTh>
+                <MudTh>Description</MudTh>
+                <MudTh>IP Address</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Time">
+                    <MudText Typo="Typo.caption">@context.Timestamp.ToString("MMM dd HH:mm:ss")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Level">
+                    <MudChip Size="Size.Small" Color="@GetLevelColor(context.Level)">
+                        @context.Level
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="User">
+                    @if (!string.IsNullOrEmpty(context.UserName))
+                    {
+                        <MudText Typo="Typo.body2">@context.UserName</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">System</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Action">
+                    <MudText Typo="Typo.body2">@context.Action</MudText>
+                </MudTd>
+                <MudTd DataLabel="Entity">
+                    <MudText Typo="Typo.body2">@context.EntityType</MudText>
+                </MudTd>
+                <MudTd DataLabel="Description">
+                    @if (!string.IsNullOrEmpty(context.Description))
+                    {
+                        <MudText Typo="Typo.body2">@context.Description.TruncateWithEllipsis(50)</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="IP Address">
+                    @if (!string.IsNullOrEmpty(context.IpAddress))
+                    {
+                        <MudText Typo="Typo.caption">@context.IpAddress</MudText>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private bool isLoading = true;
+    private List<AuditLogDto> auditLogs = new();
+    private string searchString = "";
+    private string selectedLevel = "All";
+    private string selectedEntityType = "All";
+    private DateTime? fromDate = DateTime.Today.AddDays(-7);
+    private DateTime? toDate = DateTime.Today.AddDays(1);
+
+    private List<AuditLogDto> filteredLogs => auditLogs
+        .Where(log => 
+            (selectedLevel == "All" || log.Level == selectedLevel) &&
+            (selectedEntityType == "All" || log.EntityType == selectedEntityType) &&
+            (!fromDate.HasValue || log.Timestamp >= fromDate.Value) &&
+            (!toDate.HasValue || log.Timestamp <= toDate.Value) &&
+            (string.IsNullOrWhiteSpace(searchString) || 
+             log.Action.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+             log.EntityType.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+             (log.Description?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+             (log.UserName?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)))
+        .OrderByDescending(log => log.Timestamp)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogs();
+    }
+
+    private async Task LoadLogs()
+    {
+        isLoading = true;
+        try
+        {
+            auditLogs = await DashboardService.GetRecentActivitiesAsync(100);
+            
+            // Add some mock data for demonstration
+            if (!auditLogs.Any())
+            {
+                auditLogs = GenerateMockLogs();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load audit logs: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private List<AuditLogDto> GenerateMockLogs()
+    {
+        var random = new Random();
+        var logs = new List<AuditLogDto>();
+        var actions = new[] { "Create", "Update", "Delete", "Login", "Logout", "Start", "Stop" };
+        var entities = new[] { "User", "Service", "Tenant", "Configuration" };
+        var levels = new[] { "Info", "Warning", "Error" };
+        var users = new[] { "Admin User", "John Doe", "Jane Smith", null };
+
+        for (int i = 0; i < 50; i++)
+        {
+            var entityType = entities[random.Next(entities.Length)];
+            var action = actions[random.Next(actions.Length)];
+            var level = levels[random.Next(levels.Length)];
+            var user = users[random.Next(users.Length)];
+
+            logs.Add(new AuditLogDto
+            {
+                Id = Guid.NewGuid(),
+                UserId = user != null ? Guid.NewGuid() : null,
+                UserName = user,
+                TenantId = Guid.NewGuid(),
+                Action = action,
+                EntityType = entityType,
+                EntityId = Guid.NewGuid(),
+                Description = $"{action} {entityType.ToLower()} operation completed",
+                IpAddress = $"192.168.1.{random.Next(1, 255)}",
+                UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                Timestamp = DateTime.UtcNow.AddMinutes(-random.Next(0, 10080)), // Within last week
+                Level = level
+            });
+        }
+
+        return logs.OrderByDescending(l => l.Timestamp).ToList();
+    }
+
+    private Color GetLevelColor(string level) => level switch
+    {
+        "Info" => Color.Info,
+        "Warning" => Color.Warning,
+        "Error" => Color.Error,
+        "Critical" => Color.Error,
+        _ => Color.Default
+    };
+}

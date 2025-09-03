@@ -1,0 +1,37 @@
+﻿@using MudBlazor
+
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="Icons.Material.Filled.Dashboard">
+        Dashboard
+    </MudNavLink>
+    
+    <MudNavGroup Text="Services" Icon="Icons.Material.Filled.CloudQueue" Expanded="true">
+        <MudNavLink Href="/services" Icon="Icons.Material.Filled.List">
+            All Services
+        </MudNavLink>
+        <MudNavLink Href="/services/create" Icon="Icons.Material.Filled.Add">
+            Create Service
+        </MudNavLink>
+    </MudNavGroup>
+    
+    <MudNavLink Href="/users" Icon="Icons.Material.Filled.People">
+        Users
+    </MudNavLink>
+    
+    <MudNavLink Href="/logs" Icon="Icons.Material.Filled.History">
+        Audit Logs
+    </MudNavLink>
+    
+    <MudNavGroup Text="Settings" Icon="Icons.Material.Filled.Settings">
+        <MudNavLink Href="/settings/tenant" Icon="Icons.Material.Filled.Business">
+            Tenant Settings
+        </MudNavLink>
+        <MudNavLink Href="/settings/notifications" Icon="Icons.Material.Filled.Notifications">
+            Notifications
+        </MudNavLink>
+    </MudNavGroup>
+    
+    <MudNavLink Href="/monitoring" Icon="Icons.Material.Filled.MonitorHeart">
+        Monitoring
+    </MudNavLink>
+</MudNavMenu>

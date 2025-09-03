@@ -1,0 +1,298 @@
+@page "/services"
+@attribute [Authorize]
+@inject IServiceInstanceService ServiceInstanceService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Services - DockSaaS</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h3">Services</MudText>
+    <MudButton Href="/services/create" 
+               Color="Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="Icons.Material.Filled.Add">
+        Create Service
+    </MudButton>
+</div>
+
+@if (isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+<MudCard Elevation="4">
+    <MudCardContent>
+        @if (serviceInstances.Any())
+        {
+            <MudTable Items="serviceInstances" 
+                      Hover="true" 
+                      Dense="false" 
+                      Filter="new Func<ServiceInstanceDto, bool>(FilterFunc)">
+                <ToolBarContent>
+                    <MudText Typo="Typo.h6">Service Instances</MudText>
+                    <MudSpacer />
+                    <MudTextField @bind-Value="searchString" 
+                                  Placeholder="Search services..." 
+                                  Adornment="Adornment.Start" 
+                                  AdornmentIcon="Icons.Material.Filled.Search" 
+                                  IconSize="Size.Medium" 
+                                  Class="mt-0" />
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Endpoint</MudTh>
+                    <MudTh>Usage</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@GetServiceIcon(context.ServiceType)" Class="me-2" />
+                            @context.Name
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudChip Size="Size.Small" Color="Color.Default">@context.ServiceType</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Endpoint">
+                        @if (!string.IsNullOrEmpty(context.EndpointUrl))
+                        {
+                            <MudLink Href="@context.EndpointUrl" Target="_blank">
+                                @TruncateUrl(context.EndpointUrl, 30)
+                            </MudLink>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Not configured</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Usage">
+                        @if (context.UsageQuota > 0)
+                        {
+                            var percentage = (double)context.CurrentUsage / context.UsageQuota * 100;
+                            <div>
+                                <MudProgressLinear Value="percentage" Color="@GetUsageColor(percentage)" />
+                                <MudText Typo="Typo.caption">
+                                    @FormatBytes(context.CurrentUsage) / @FormatBytes(context.UsageQuota) (@percentage.ToString("F1")%)
+                                </MudText>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption">@FormatBytes(context.CurrentUsage) (No limit)</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Created">
+                        <MudText Typo="Typo.caption">@context.CreatedAt.ToString("MMM dd, yyyy")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudButtonGroup Size="Size.Small">
+                            @if (context.Status == "Stopped")
+                            {
+                                <MudIconButton Icon="Icons.Material.Filled.PlayArrow" 
+                                               Color="Color.Success" 
+                                               Size="Size.Small"
+                                               OnClick="@(() => StartService(context.Id))"
+                                               Title="Start Service" />
+                            }
+                            else if (context.Status == "Running")
+                            {
+                                <MudIconButton Icon="Icons.Material.Filled.Stop" 
+                                               Color="Color.Warning" 
+                                               Size="Size.Small"
+                                               OnClick="@(() => StopService(context.Id))"
+                                               Title="Stop Service" />
+                            }
+                            <MudIconButton Icon="Icons.Material.Filled.Visibility" 
+                                           Color="Color.Primary" 
+                                           Size="Size.Small"
+                                           Href="@($"/services/{context.Id}")"
+                                           Title="View Details" />
+                            <MudIconButton Icon="Icons.Material.Filled.Settings" 
+                                           Color="Color.Default" 
+                                           Size="Size.Small"
+                                           OnClick="@(() => ConfigureService(context.Id))"
+                                           Title="Configure" />
+                            <MudIconButton Icon="Icons.Material.Filled.Delete" 
+                                           Color="Color.Error" 
+                                           Size="Size.Small"
+                                           OnClick="@(() => DeleteService(context.Id, context.Name))"
+                                           Title="Delete Service" />
+                        </MudButtonGroup>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+        else if (!isLoading)
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="Icons.Material.Filled.CloudOff" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-4">No services found</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    @(string.IsNullOrEmpty(searchString) ? "Create your first service to get started" : "No services match your search criteria")
+                </MudText>
+                @if (string.IsNullOrEmpty(searchString))
+                {
+                    <MudButton Href="/services/create" 
+                               Color="Color.Primary" 
+                               Variant="Variant.Filled" 
+                               StartIcon="Icons.Material.Filled.Add">
+                        Create First Service
+                    </MudButton>
+                }
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private bool isLoading = true;
+    private List<ServiceInstanceDto> serviceInstances = new();
+    private string searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServices();
+    }
+
+    private async Task LoadServices()
+    {
+        isLoading = true;
+        try
+        {
+            serviceInstances = await ServiceInstanceService.GetServiceInstancesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load services: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool FilterFunc(ServiceInstanceDto service)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        
+        return service.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+               service.ServiceType.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+               service.Status.Contains(searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task StartService(Guid serviceId)
+    {
+        var result = await ServiceInstanceService.StartServiceInstanceAsync(serviceId);
+        if (result)
+        {
+            Snackbar.Add("Service started successfully", Severity.Success);
+            await LoadServices();
+        }
+        else
+        {
+            Snackbar.Add("Failed to start service", Severity.Error);
+        }
+    }
+
+    private async Task StopService(Guid serviceId)
+    {
+        var result = await ServiceInstanceService.StopServiceInstanceAsync(serviceId);
+        if (result)
+        {
+            Snackbar.Add("Service stopped successfully", Severity.Success);
+            await LoadServices();
+        }
+        else
+        {
+            Snackbar.Add("Failed to stop service", Severity.Error);
+        }
+    }
+
+    private async Task DeleteService(Guid serviceId, string serviceName)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Delete Service",
+            $"Are you sure you want to delete '{serviceName}'? This action cannot be undone.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (result == true)
+        {
+            var deleteResult = await ServiceInstanceService.DeleteServiceInstanceAsync(serviceId);
+            if (deleteResult)
+            {
+                Snackbar.Add($"Service '{serviceName}' deleted successfully", Severity.Success);
+                await LoadServices();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete service", Severity.Error);
+            }
+        }
+    }
+
+    private void ConfigureService(Guid serviceId)
+    {
+        // TODO: Implement service configuration dialog
+        Snackbar.Add("Service configuration not yet implemented", Severity.Info);
+    }
+
+    private string GetServiceIcon(string serviceType) => serviceType switch
+    {
+        "S3Storage" => Icons.Material.Filled.Storage,
+        "RDSDatabase" => Icons.Material.Filled.Storage, // Using Storage as Database is not available
+        "NoSQLDatabase" => Icons.Material.Filled.TableChart,
+        "Queue" => Icons.Material.Filled.Queue,
+        "Function" => Icons.Material.Filled.Functions,
+        _ => Icons.Material.Filled.Cloud
+    };
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Running" => Color.Success,
+        "Stopped" => Color.Default,
+        "Error" => Color.Error,
+        "Created" => Color.Info,
+        _ => Color.Default
+    };
+
+    private Color GetUsageColor(double percentage) => percentage switch
+    {
+        var x when x < 70 => Color.Success,
+        var x when x < 90 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private string TruncateUrl(string url, int maxLength)
+    {
+        if (url.Length <= maxLength) return url;
+        return $"{url[..maxLength]}...";
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}}}

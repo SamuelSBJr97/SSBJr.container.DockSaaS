@@ -1,0 +1,326 @@
+@page "/services/create"
+@attribute [Authorize]
+@inject IServiceInstanceService ServiceInstanceService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using System.Text.Json
+
+<PageTitle>Create Service - DockSaaS</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Create New Service</MudText>
+
+<MudCard Elevation="4">
+    <MudCardContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudGrid>
+                <!-- Service Selection -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" GutterBottom="true">Select Service Type</MudText>
+                    @if (isLoadingDefinitions)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                    }
+                    else
+                    {
+                        <MudGrid>
+                            @foreach (var definition in serviceDefinitions)
+                            {
+                                <MudItem xs="12" sm="6" md="4">
+                                    <MudCard Elevation="@(selectedDefinition?.Id == definition.Id ? 8 : 2)" 
+                                             Class="@(selectedDefinition?.Id == definition.Id ? "mud-theme-primary" : "")"
+                                             Style="cursor: pointer; height: 100%;"
+                                             @onclick="@(() => SelectServiceDefinition(definition))">
+                                        <MudCardContent Class="text-center">
+                                            <MudIcon Icon="@GetServiceIcon(definition.Type)" 
+                                                     Size="Size.Large" 
+                                                     Color="@(selectedDefinition?.Id == definition.Id ? Color.Inherit : Color.Primary)" 
+                                                     Class="mb-2" />
+                                            <MudText Typo="Typo.h6">@definition.Name</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                @definition.Description
+                                            </MudText>
+                                        </MudCardContent>
+                                    </MudCard>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    }
+                </MudItem>
+
+                @if (selectedDefinition != null)
+                {
+                    <!-- Service Configuration -->
+                    <MudItem xs="12">
+                        <MudDivider Class="my-4" />
+                        <MudText Typo="Typo.h6" GutterBottom="true">Configure @selectedDefinition.Name</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="serviceName"
+                                      For="@(() => serviceName)"
+                                      Label="Service Name"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      HelperText="Unique name for your service instance" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="usageQuota"
+                                         For="@(() => usageQuota)"
+                                         Label="Usage Quota (bytes)"
+                                         Variant="Variant.Outlined"
+                                         Min="0"
+                                         HelperText="0 = unlimited" />
+                    </MudItem>
+
+                    <!-- Dynamic Configuration Fields -->
+                    <MudItem xs="12">
+                        <MudExpansionPanels>
+                            <MudExpansionPanel Text="Advanced Configuration">
+                                @if (configurationFields.Any())
+                                {
+                                    <MudGrid>
+                                        @foreach (var field in configurationFields)
+                                        {
+                                            <MudItem xs="12" md="6">
+                                                @if (field.Type == "string")
+                                                {
+                                                    <MudTextField @bind-Value="field.Value"
+                                                                  Label="@field.Label"
+                                                                  Variant="Variant.Outlined"
+                                                                  HelperText="@field.Description" />
+                                                }
+                                                else if (field.Type == "boolean")
+                                                {
+                                                    <MudSwitch @bind-Value="field.BoolValue"
+                                                               Label="@field.Label"
+                                                               Color="Color.Primary" />
+                                                }
+                                                else if (field.Type == "integer")
+                                                {
+                                                    <MudNumericField @bind-Value="field.IntValue"
+                                                                     Label="@field.Label"
+                                                                     Variant="Variant.Outlined"
+                                                                     HelperText="@field.Description" />
+                                                }
+                                            </MudItem>
+                                        }
+                                    </MudGrid>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        No additional configuration required for this service type.
+                                    </MudText>
+                                }
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    </MudItem>
+
+                    <!-- Actions -->
+                    <MudItem xs="12">
+                        <MudDivider Class="my-4" />
+                        <div class="d-flex justify-end gap-2">
+                            <MudButton Variant="Variant.Text" 
+                                       Color="Color.Default"
+                                       OnClick="Cancel">
+                                Cancel
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Primary"
+                                       OnClick="CreateServiceInstance"
+                                       Disabled="@(!success || isCreating)"
+                                       StartIcon="@(isCreating ? null : Icons.Material.Filled.Add)">
+                                @if (isCreating)
+                                {
+                                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                    <MudText Class="ms-2">Creating...</MudText>
+                                }
+                                else
+                                {
+                                    <span>Create Service</span>
+                                }
+                            </MudButton>
+                        </div>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private MudForm form = null!;
+    private bool success = false;
+    private bool isLoadingDefinitions = true;
+    private bool isCreating = false;
+
+    private List<ServiceDefinitionDto> serviceDefinitions = new();
+    private ServiceDefinitionDto? selectedDefinition;
+    
+    private string serviceName = "";
+    private long usageQuota = 0;
+    private List<ConfigurationField> configurationFields = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServiceDefinitions();
+    }
+
+    private async Task LoadServiceDefinitions()
+    {
+        isLoadingDefinitions = true;
+        try
+        {
+            serviceDefinitions = await ServiceInstanceService.GetServiceDefinitionsAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load service definitions: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingDefinitions = false;
+        }
+    }
+
+    private void SelectServiceDefinition(ServiceDefinitionDto definition)
+    {
+        selectedDefinition = definition;
+        LoadConfigurationFields();
+    }
+
+    private void LoadConfigurationFields()
+    {
+        configurationFields.Clear();
+        
+        if (selectedDefinition == null) return;
+
+        try
+        {
+            var defaultConfig = JsonSerializer.Deserialize<JsonElement>(selectedDefinition.DefaultConfiguration);
+            
+            foreach (var property in defaultConfig.EnumerateObject())
+            {
+                var field = new ConfigurationField
+                {
+                    Name = property.Name,
+                    Label = FormatFieldLabel(property.Name)
+                };
+
+                switch (property.Value.ValueKind)
+                {
+                    case JsonValueKind.String:
+                        field.Type = "string";
+                        field.Value = property.Value.GetString() ?? "";
+                        break;
+                    case JsonValueKind.Number:
+                        field.Type = "integer";
+                        field.IntValue = property.Value.GetInt32();
+                        break;
+                    case JsonValueKind.True:
+                    case JsonValueKind.False:
+                        field.Type = "boolean";
+                        field.BoolValue = property.Value.GetBoolean();
+                        break;
+                }
+
+                configurationFields.Add(field);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to parse configuration schema: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private async Task CreateServiceInstance()
+    {
+        if (!success || selectedDefinition == null) return;
+
+        isCreating = true;
+        try
+        {
+            var configuration = BuildConfiguration();
+            
+            var request = new CreateServiceInstanceRequest
+            {
+                Name = serviceName,
+                ServiceDefinitionId = selectedDefinition.Id,
+                Configuration = configuration,
+                UsageQuota = usageQuota
+            };
+
+            var result = await ServiceInstanceService.CreateServiceInstanceAsync(request);
+            
+            if (result != null)
+            {
+                Snackbar.Add($"Service '{serviceName}' created successfully", Severity.Success);
+                Navigation.NavigateTo($"/services/{result.Id}");
+            }
+            else
+            {
+                Snackbar.Add("Failed to create service", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating service: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private string BuildConfiguration()
+    {
+        var config = new Dictionary<string, object>();
+        
+        foreach (var field in configurationFields)
+        {
+            object value = field.Type switch
+            {
+                "string" => field.Value,
+                "integer" => field.IntValue,
+                "boolean" => field.BoolValue,
+                _ => field.Value
+            };
+            config[field.Name] = value;
+        }
+
+        return JsonSerializer.Serialize(config);
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/services");
+    }
+
+    private string GetServiceIcon(string serviceType) => serviceType switch
+    {
+        "S3Storage" => Icons.Material.Filled.Storage,
+        "RDSDatabase" => Icons.Material.Filled.Storage, // Using Storage as Database is not available
+        "NoSQLDatabase" => Icons.Material.Filled.TableChart,
+        "Queue" => Icons.Material.Filled.Queue,
+        "Function" => Icons.Material.Filled.Functions,
+        _ => Icons.Material.Filled.Cloud
+    };
+
+    private string FormatFieldLabel(string fieldName)
+    {
+        // Convert camelCase to Title Case
+        return System.Text.RegularExpressions.Regex.Replace(fieldName, "(\\B[A-Z])", " $1");
+    }
+
+    private class ConfigurationField
+    {
+        public string Name { get; set; } = "";
+        public string Label { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Value { get; set; } = "";
+        public int IntValue { get; set; }
+        public bool BoolValue { get; set; }
+    }
+}

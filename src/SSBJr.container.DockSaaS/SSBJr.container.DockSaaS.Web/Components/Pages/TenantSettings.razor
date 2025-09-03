@@ -1,0 +1,307 @@
+@page "/settings/tenant"
+@attribute [Authorize(Roles = "Admin")]
+@inject ISnackbar Snackbar
+
+<PageTitle>Tenant Settings - DockSaaS</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Tenant Settings</MudText>
+
+<MudGrid>
+    <!-- General Settings -->
+    <MudItem xs="12" md="8">
+        <MudCard Elevation="4" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">General Information</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudForm @ref="form" @bind-IsValid="@isFormValid">
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="tenantSettings.Name"
+                                          Label="Organization Name"
+                                          Variant="Variant.Outlined"
+                                          Required="true"
+                                          Class="mb-3" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect @bind-Value="tenantSettings.Plan" Label="Plan" Variant="Variant.Outlined" Class="mb-3">
+                                <MudSelectItem Value="@("Free")">Free</MudSelectItem>
+                                <MudSelectItem Value="@("Pro")">Pro</MudSelectItem>
+                                <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="tenantSettings.Description"
+                                          Label="Description"
+                                          Variant="Variant.Outlined"
+                                          Lines="3"
+                                          Class="mb-3" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="tenantSettings.LogoUrl"
+                                          Label="Logo URL"
+                                          Variant="Variant.Outlined"
+                                          Class="mb-3" />
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Color="Color.Primary" 
+                           Variant="Variant.Filled" 
+                           OnClick="SaveGeneralSettings"
+                           Disabled="!isFormValid || isSaving">
+                    @if (isSaving)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ms-2">Saving...</MudText>
+                    }
+                    else
+                    {
+                        <span>Save Changes</span>
+                    }
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+
+        <!-- Resource Limits -->
+        <MudCard Elevation="4" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Resource Limits</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudNumericField @bind-Value="tenantSettings.UserLimit"
+                                         Label="Maximum Users"
+                                         Variant="Variant.Outlined"
+                                         Min="1"
+                                         Class="mb-3" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudNumericField @bind-Value="storageLimit"
+                                         Label="Storage Limit (GB)"
+                                         Variant="Variant.Outlined"
+                                         Min="0"
+                                         Class="mb-3" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudNumericField @bind-Value="tenantSettings.ApiCallsLimit"
+                                         Label="API Calls Limit (per month)"
+                                         Variant="Variant.Outlined"
+                                         Min="0"
+                                         Class="mb-3" />
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Color="Color.Primary" 
+                           Variant="Variant.Filled" 
+                           OnClick="SaveLimits"
+                           Disabled="isSaving">
+                    Save Limits
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <!-- Current Usage -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="4" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Current Usage</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="mb-4">
+                    <div class="d-flex justify-space-between mb-2">
+                        <MudText Typo="Typo.body1">Users</MudText>
+                        <MudText Typo="Typo.body2">@tenantSettings.CurrentUsers / @tenantSettings.UserLimit</MudText>
+                    </div>
+                    <MudProgressLinear Value="@GetUserUsagePercent()" Color="@GetUsageColor(GetUserUsagePercent())" />
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-space-between mb-2">
+                        <MudText Typo="Typo.body1">Storage</MudText>
+                        <MudText Typo="Typo.body2">@FormatBytes(tenantSettings.CurrentStorage) / @FormatBytes(tenantSettings.StorageLimit)</MudText>
+                    </div>
+                    <MudProgressLinear Value="@GetStorageUsagePercent()" Color="@GetUsageColor(GetStorageUsagePercent())" />
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-space-between mb-2">
+                        <MudText Typo="Typo.body1">API Calls</MudText>
+                        <MudText Typo="Typo.body2">@tenantSettings.CurrentApiCalls.ToString("N0") / @tenantSettings.ApiCallsLimit.ToString("N0")</MudText>
+                    </div>
+                    <MudProgressLinear Value="@GetApiCallsUsagePercent()" Color="@GetUsageColor(GetApiCallsUsagePercent())" />
+                </div>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Plan Information -->
+        <MudCard Elevation="4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Plan Information</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="mb-3">
+                    <MudText Typo="Typo.h5" Color="Color.Primary">@tenantSettings.Plan Plan</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Active since @tenantSettings.CreatedAt.ToString("MMM dd, yyyy")
+                    </MudText>
+                </div>
+
+                <MudList Dense="true">
+                    <MudListItem Icon="Icons.Material.Filled.People" Text="@($"{tenantSettings.UserLimit} Users")" />
+                    <MudListItem Icon="Icons.Material.Filled.Storage" Text="@($"{FormatBytes(tenantSettings.StorageLimit)} Storage")" />
+                    <MudListItem Icon="Icons.Material.Filled.Api" Text="@($"{tenantSettings.ApiCallsLimit:N0} API Calls/month")" />
+                </MudList>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Color="Color.Primary" 
+                           Variant="Variant.Outlined" 
+                           FullWidth="true"
+                           OnClick="UpgradePlan">
+                    @(tenantSettings.Plan == "Free" ? "Upgrade Plan" : "Change Plan")
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private MudForm form = null!;
+    private bool isFormValid = false;
+    private bool isSaving = false;
+    private TenantSettingsModel tenantSettings = new();
+    private int storageLimit = 1; // GB
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Mock data for demonstration
+        tenantSettings = new TenantSettingsModel
+        {
+            Id = Guid.NewGuid(),
+            Name = "Acme Corporation",
+            Description = "Leading provider of innovative solutions",
+            LogoUrl = "",
+            Plan = "Pro",
+            UserLimit = 50,
+            StorageLimit = 107374182400, // 100 GB
+            ApiCallsLimit = 100000,
+            CurrentUsers = 15,
+            CurrentStorage = 32212254720, // 30 GB
+            CurrentApiCalls = 25000,
+            CreatedAt = DateTime.UtcNow.AddMonths(-6),
+            IsActive = true
+        };
+
+        storageLimit = (int)(tenantSettings.StorageLimit / 1073741824); // Convert to GB
+    }
+
+    private async Task SaveGeneralSettings()
+    {
+        if (!isFormValid) return;
+
+        isSaving = true;
+        try
+        {
+            // Simulate API call
+            await Task.Delay(1000);
+            Snackbar.Add("General settings saved successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save settings: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveLimits()
+    {
+        isSaving = true;
+        try
+        {
+            tenantSettings.StorageLimit = storageLimit * 1073741824L; // Convert GB to bytes
+            // Simulate API call
+            await Task.Delay(1000);
+            Snackbar.Add("Resource limits updated successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to update limits: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void UpgradePlan()
+    {
+        Snackbar.Add("Plan upgrade not yet implemented", Severity.Info);
+    }
+
+    private double GetUserUsagePercent()
+    {
+        return tenantSettings.UserLimit > 0 ? (double)tenantSettings.CurrentUsers / tenantSettings.UserLimit * 100 : 0;
+    }
+
+    private double GetStorageUsagePercent()
+    {
+        return tenantSettings.StorageLimit > 0 ? (double)tenantSettings.CurrentStorage / tenantSettings.StorageLimit * 100 : 0;
+    }
+
+    private double GetApiCallsUsagePercent()
+    {
+        return tenantSettings.ApiCallsLimit > 0 ? (double)tenantSettings.CurrentApiCalls / tenantSettings.ApiCallsLimit * 100 : 0;
+    }
+
+    private Color GetUsageColor(double percentage) => percentage switch
+    {
+        var x when x < 70 => Color.Success,
+        var x when x < 90 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    public class TenantSettingsModel
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public string? LogoUrl { get; set; }
+        public string Plan { get; set; } = "Free";
+        public int UserLimit { get; set; } = 10;
+        public long StorageLimit { get; set; } = 1073741824; // 1GB
+        public int ApiCallsLimit { get; set; } = 10000;
+        public int CurrentUsers { get; set; }
+        public long CurrentStorage { get; set; }
+        public int CurrentApiCalls { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsActive { get; set; }
+    }
+}

@@ -1,0 +1,201 @@
+@page "/users"
+@attribute [Authorize(Roles = "Admin,Manager")]
+@inject ISnackbar Snackbar
+
+<PageTitle>Users - DockSaaS</PageTitle>
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h3">User Management</MudText>
+    <MudButton Color="Color.Primary" 
+               Variant="Variant.Filled" 
+               StartIcon="Icons.Material.Filled.PersonAdd"
+               OnClick="OpenCreateUserDialog">
+        Add User
+    </MudButton>
+</div>
+
+<MudCard Elevation="4">
+    <MudCardContent>
+        <MudTable Items="users" 
+                  Hover="true" 
+                  Dense="false" 
+                  Filter="new Func<UserInfo, bool>(FilterFunc)">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Tenant Users</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="searchString" 
+                              Placeholder="Search users..." 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="Icons.Material.Filled.Search" 
+                              IconSize="Size.Medium" 
+                              Class="mt-0" />
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>User</MudTh>
+                <MudTh>Email</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Last Login</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="User">
+                    <div class="d-flex align-center">
+                        <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="mr-3">
+                            @if (!string.IsNullOrEmpty(context.AvatarUrl))
+                            {
+                                <MudImage Src="@context.AvatarUrl" />
+                            }
+                            else
+                            {
+                                @context.FirstName.FirstOrDefault()@context.LastName.FirstOrDefault()
+                            }
+                        </MudAvatar>
+                        <div>
+                            <MudText Typo="Typo.body1">@context.FullName</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Joined @context.CreatedAt.ToString("MMM yyyy")
+                            </MudText>
+                        </div>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Email">@context.Email</MudTd>
+                <MudTd DataLabel="Role">
+                    <MudChip Size="Size.Small" Color="@GetRoleColor(context.Role)">
+                        @context.Role
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "Active" : "Inactive")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Last Login">
+                    @if (context.LastLoginAt.HasValue)
+                    {
+                        <MudText Typo="Typo.body2">@context.LastLoginAt.Value.ToString("MMM dd, HH:mm")</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Never</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudButtonGroup Size="Size.Small">
+                        <MudIconButton Icon="Icons.Material.Filled.Edit" 
+                                       Color="Color.Primary" 
+                                       Size="Size.Small"
+                                       OnClick="@(() => EditUser(context))"
+                                       Title="Edit User" />
+                        @if (context.IsActive)
+                        {
+                            <MudIconButton Icon="Icons.Material.Filled.Block" 
+                                           Color="Color.Warning" 
+                                           Size="Size.Small"
+                                           OnClick="@(() => ToggleUserStatus(context))"
+                                           Title="Deactivate User" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="Icons.Material.Filled.CheckCircle" 
+                                           Color="Color.Success" 
+                                           Size="Size.Small"
+                                           OnClick="@(() => ToggleUserStatus(context))"
+                                           Title="Activate User" />
+                        }
+                        <MudIconButton Icon="Icons.Material.Filled.Delete" 
+                                       Color="Color.Error" 
+                                       Size="Size.Small"
+                                       OnClick="@(() => DeleteUser(context))"
+                                       Title="Delete User" />
+                    </MudButtonGroup>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<UserInfo> users = new();
+    private string searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Mock data for demonstration
+        users = new List<UserInfo>
+        {
+            new() { Id = Guid.NewGuid(), FirstName = "Admin", LastName = "User", Email = "admin@example.com", Role = "Admin", IsActive = true, CreatedAt = DateTime.UtcNow.AddDays(-30), LastLoginAt = DateTime.UtcNow.AddHours(-1) },
+            new() { Id = Guid.NewGuid(), FirstName = "John", LastName = "Doe", Email = "john@example.com", Role = "User", IsActive = true, CreatedAt = DateTime.UtcNow.AddDays(-15), LastLoginAt = DateTime.UtcNow.AddDays(-2) },
+            new() { Id = Guid.NewGuid(), FirstName = "Jane", LastName = "Smith", Email = "jane@example.com", Role = "Manager", IsActive = false, CreatedAt = DateTime.UtcNow.AddDays(-10) }
+        };
+    }
+
+    private bool FilterFunc(UserInfo user)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        
+        return user.FullName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+               user.Email.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+               user.Role.Contains(searchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OpenCreateUserDialog()
+    {
+        Snackbar.Add("Create user dialog not yet implemented", Severity.Info);
+    }
+
+    private void EditUser(UserInfo user)
+    {
+        Snackbar.Add($"Edit user '{user.FullName}' not yet implemented", Severity.Info);
+    }
+
+    private async Task ToggleUserStatus(UserInfo user)
+    {
+        user.IsActive = !user.IsActive;
+        var action = user.IsActive ? "activated" : "deactivated";
+        Snackbar.Add($"User '{user.FullName}' {action} successfully", Severity.Success);
+    }
+
+    private async Task DeleteUser(UserInfo user)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Delete User",
+            $"Are you sure you want to delete '{user.FullName}'? This action cannot be undone.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (result == true)
+        {
+            users.Remove(user);
+            Snackbar.Add($"User '{user.FullName}' deleted successfully", Severity.Success);
+        }
+    }
+
+    private Color GetRoleColor(string role) => role switch
+    {
+        "Admin" => Color.Error,
+        "Manager" => Color.Warning,
+        "User" => Color.Primary,
+        _ => Color.Default
+    };
+
+    public class UserInfo
+    {
+        public Guid Id { get; set; }
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Role { get; set; } = "";
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? LastLoginAt { get; set; }
+        public string? AvatarUrl { get; set; }
+        public string FullName => $"{FirstName} {LastName}";
+    }
+}
+
+@inject IDialogService DialogService

@@ -1,0 +1,184 @@
+@page "/login"
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudContainer Component="main" MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center mud-height-full">
+    <MudPaper Elevation="25" Class="pa-8" Style="width: 100%; max-width: 400px;">
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <div class="d-flex align-center justify-center mb-6">
+                <MudText Typo="Typo.h4" Color="Color.Primary">DockSaaS</MudText>
+            </div>
+            
+            <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">
+                @(isRegister ? "Create Account" : "Sign In")
+            </MudText>
+
+            @if (isRegister)
+            {
+                <MudTextField @bind-Value="registerRequest.FirstName"
+                              For="@(() => registerRequest.FirstName)"
+                              Label="First Name"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              Class="mb-3" />
+
+                <MudTextField @bind-Value="registerRequest.LastName"
+                              For="@(() => registerRequest.LastName)"
+                              Label="Last Name"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              Class="mb-3" />
+
+                <MudTextField @bind-Value="registerRequest.TenantName"
+                              For="@(() => registerRequest.TenantName)"
+                              Label="Company/Tenant Name"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              Class="mb-3" />
+
+                <MudTextField @bind-Value="registerRequest.Email"
+                              For="@(() => registerRequest.Email)"
+                              Label="Email"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Required="true"
+                              Class="mb-3" />
+
+                <MudTextField @bind-Value="registerRequest.Password"
+                              For="@(() => registerRequest.Password)"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Password"
+                              Required="true"
+                              Class="mb-3" />
+            }
+            else
+            {
+                <MudTextField @bind-Value="loginRequest.Email"
+                              For="@(() => loginRequest.Email)"
+                              Label="Email"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Required="true"
+                              Class="mb-3" />
+
+                <MudTextField @bind-Value="loginRequest.Password"
+                              For="@(() => loginRequest.Password)"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Password"
+                              Required="true"
+                              Class="mb-3" />
+
+                <MudTextField @bind-Value="loginRequest.TenantName"
+                              For="@(() => loginRequest.TenantName)"
+                              Label="Tenant Name (Optional)"
+                              Variant="Variant.Outlined"
+                              Class="mb-3"
+                              HelperText="Leave empty to use default tenant" />
+            }
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       FullWidth="true"
+                       Class="mb-3"
+                       OnClick="HandleSubmit"
+                       Disabled="isLoading">
+                @if (isLoading)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">@(isRegister ? "Creating Account..." : "Signing In...")</MudText>
+                }
+                else
+                {
+                    @(isRegister ? "Create Account" : "Sign In")
+                }
+            </MudButton>
+
+            <MudDivider Class="mb-3" />
+
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       OnClick="ToggleMode">
+                @(isRegister ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
+            </MudButton>
+        </MudForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudForm form = null!;
+    private bool success = false;
+    private bool isLoading = false;
+    private bool isRegister = false;
+
+    private LoginRequest loginRequest = new();
+    private RegisterRequest registerRequest = new();
+
+    private async Task HandleSubmit()
+    {
+        if (!success) return;
+
+        isLoading = true;
+        bool result = false;
+
+        try
+        {
+            if (isRegister)
+            {
+                result = await AuthService.RegisterAsync(registerRequest);
+                if (result)
+                {
+                    Snackbar.Add("Account created successfully! Welcome to DockSaaS.", Severity.Success);
+                    Navigation.NavigateTo("/");
+                }
+                else
+                {
+                    Snackbar.Add("Registration failed. Please check your information and try again.", Severity.Error);
+                }
+            }
+            else
+            {
+                result = await AuthService.LoginAsync(loginRequest);
+                if (result)
+                {
+                    Snackbar.Add("Welcome back!", Severity.Success);
+                    Navigation.NavigateTo("/");
+                }
+                else
+                {
+                    Snackbar.Add("Login failed. Please check your credentials and try again.", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"An error occurred: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleMode()
+    {
+        isRegister = !isRegister;
+        // Reset forms
+        loginRequest = new();
+        registerRequest = new();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is already authenticated
+        if (await AuthService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+}
