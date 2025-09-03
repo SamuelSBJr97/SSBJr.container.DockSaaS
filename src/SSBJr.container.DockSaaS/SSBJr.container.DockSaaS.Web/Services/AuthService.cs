@@ -1,5 +1,6 @@
 using SSBJr.container.DockSaaS.Web.Models;
 using Blazored.LocalStorage;
+using Microsoft.JSInterop;
 
 namespace SSBJr.container.DockSaaS.Web.Services;
 
@@ -17,12 +18,14 @@ public class AuthService : IAuthService
     private readonly ApiClient _apiClient;
     private readonly ILocalStorageService _localStorage;
     private readonly ILogger<AuthService> _logger;
+    private readonly IJSRuntime _jsRuntime;
 
-    public AuthService(ApiClient apiClient, ILocalStorageService localStorage, ILogger<AuthService> logger)
+    public AuthService(ApiClient apiClient, ILocalStorageService localStorage, ILogger<AuthService> logger, IJSRuntime jsRuntime)
     {
         _apiClient = apiClient;
         _localStorage = localStorage;
         _logger = logger;
+        _jsRuntime = jsRuntime;
     }
 
     public async Task<bool> LoginAsync(LoginRequest request)
@@ -31,7 +34,7 @@ public class AuthService : IAuthService
         {
             var response = await _apiClient.PostAsync<LoginRequest, LoginResponse>("api/auth/login", request);
             
-            if (response != null)
+            if (response != null && IsJavaScriptRuntimeAvailable())
             {
                 await _localStorage.SetItemAsync("authToken", response.Token);
                 await _localStorage.SetItemAsync("refreshToken", response.RefreshToken);
@@ -42,7 +45,7 @@ public class AuthService : IAuthService
                 return true;
             }
             
-            return false;
+            return response != null;
         }
         catch (Exception ex)
         {
@@ -57,7 +60,7 @@ public class AuthService : IAuthService
         {
             var response = await _apiClient.PostAsync<RegisterRequest, LoginResponse>("api/auth/register", request);
             
-            if (response != null)
+            if (response != null && IsJavaScriptRuntimeAvailable())
             {
                 await _localStorage.SetItemAsync("authToken", response.Token);
                 await _localStorage.SetItemAsync("refreshToken", response.RefreshToken);
@@ -68,7 +71,7 @@ public class AuthService : IAuthService
                 return true;
             }
             
-            return false;
+            return response != null;
         }
         catch (Exception ex)
         {
@@ -81,12 +84,16 @@ public class AuthService : IAuthService
     {
         try
         {
+            if (IsJavaScriptRuntimeAvailable())
+            {
+                await _localStorage.RemoveItemAsync("authToken");
+                await _localStorage.RemoveItemAsync("refreshToken");
+                await _localStorage.RemoveItemAsync("tokenExpiry");
+                await _localStorage.RemoveItemAsync("currentUser");
+            }
+
+            // Always try to call the API logout even if localStorage is not available
             await _apiClient.PostAsync("api/auth/logout");
-            
-            await _localStorage.RemoveItemAsync("authToken");
-            await _localStorage.RemoveItemAsync("refreshToken");
-            await _localStorage.RemoveItemAsync("tokenExpiry");
-            await _localStorage.RemoveItemAsync("currentUser");
             
             _logger.LogInformation("User logged out successfully");
             return true;
@@ -102,14 +109,17 @@ public class AuthService : IAuthService
     {
         try
         {
-            // First try to get from local storage
-            var cachedUser = await _localStorage.GetItemAsync<UserDto>("currentUser");
-            if (cachedUser != null)
-                return cachedUser;
+            // Only try localStorage if JavaScript runtime is available
+            if (IsJavaScriptRuntimeAvailable())
+            {
+                var cachedUser = await _localStorage.GetItemAsync<UserDto>("currentUser");
+                if (cachedUser != null)
+                    return cachedUser;
+            }
 
-            // If not in cache, try to get from API
+            // If not in cache or localStorage not available, try to get from API
             var user = await _apiClient.GetAsync<UserDto>("api/auth/me");
-            if (user != null)
+            if (user != null && IsJavaScriptRuntimeAvailable())
             {
                 await _localStorage.SetItemAsync("currentUser", user);
             }
@@ -127,6 +137,14 @@ public class AuthService : IAuthService
     {
         try
         {
+            // During prerendering, JavaScript interop is not available
+            if (!IsJavaScriptRuntimeAvailable())
+            {
+                // During prerendering, assume not authenticated
+                // The actual authentication state will be determined after the component renders
+                return false;
+            }
+
             var token = await _localStorage.GetItemAsync<string>("authToken");
             if (string.IsNullOrEmpty(token))
                 return false;
@@ -140,10 +158,23 @@ public class AuthService : IAuthService
 
             return true;
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("JavaScript interop"))
+        {
+            // This happens during prerendering - return false for now
+            _logger.LogDebug("JavaScript interop not available during prerendering");
+            return false;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to check authentication status");
             return false;
         }
+    }
+
+    private bool IsJavaScriptRuntimeAvailable()
+    {
+        // Check if we're in a prerendering context
+        return _jsRuntime is not IJSInProcessRuntime && 
+               !(_jsRuntime.GetType().Name.Contains("UnsupportedJavaScriptRuntime"));
     }
 }

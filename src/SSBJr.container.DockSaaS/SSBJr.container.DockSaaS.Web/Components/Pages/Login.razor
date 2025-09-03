@@ -2,6 +2,7 @@
 @inject IAuthService AuthService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
 
 <MudContainer Component="main" MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center mud-height-full">
     <MudPaper Elevation="25" Class="pa-8" Style="width: 100%; max-width: 400px;">
@@ -134,7 +135,18 @@
                 if (result)
                 {
                     Snackbar.Add("Account created successfully! Welcome to DockSaaS.", Severity.Success);
-                    Navigation.NavigateTo("/");
+                    
+                    // Notify the authentication state provider about the new user
+                    if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
+                    {
+                        var user = await AuthService.GetCurrentUserAsync();
+                        if (user != null)
+                        {
+                            customProvider.MarkUserAsAuthenticated(user);
+                        }
+                    }
+                    
+                    Navigation.NavigateTo("/", true);
                 }
                 else
                 {
@@ -147,7 +159,18 @@
                 if (result)
                 {
                     Snackbar.Add("Welcome back!", Severity.Success);
-                    Navigation.NavigateTo("/");
+                    
+                    // Notify the authentication state provider about the login
+                    if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
+                    {
+                        var user = await AuthService.GetCurrentUserAsync();
+                        if (user != null)
+                        {
+                            customProvider.MarkUserAsAuthenticated(user);
+                        }
+                    }
+                    
+                    Navigation.NavigateTo("/", true);
                 }
                 else
                 {
@@ -173,12 +196,23 @@
         registerRequest = new();
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Check if user is already authenticated
-        if (await AuthService.IsAuthenticatedAsync())
+        if (firstRender)
         {
-            Navigation.NavigateTo("/");
+            // Check if user is already authenticated (only after first render when JS is available)
+            try
+            {
+                if (await AuthService.IsAuthenticatedAsync())
+                {
+                    Navigation.NavigateTo("/");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail if authentication check fails
+                Console.WriteLine($"Error checking authentication: {ex.Message}");
+            }
         }
     }
 }

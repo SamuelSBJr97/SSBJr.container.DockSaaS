@@ -1,5 +1,8 @@
 ﻿@inherits LayoutComponentBase
 @inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
 
 <MudThemeProvider />
 <MudDialogProvider />
@@ -7,7 +10,14 @@
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudIconButton Icon="Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="@((e) => DrawerToggle())" />
+        <AuthorizeView>
+            <Authorized>
+                <MudIconButton Icon="Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="@((e) => DrawerToggle())" />
+            </Authorized>
+            <NotAuthorized>
+                <MudIconButton Icon="Icons.Material.Filled.Cloud" Color="Color.Inherit" Href="/" />
+            </NotAuthorized>
+        </AuthorizeView>
         <MudSpacer />
         <MudText Typo="Typo.h6">DockSaaS</MudText>
         <MudSpacer />
@@ -20,7 +30,10 @@
                 </MudMenu>
             </Authorized>
             <NotAuthorized>
-                <MudButton Href="/login" Color="Color.Inherit">Login</MudButton>
+                <MudButtonGroup Color="Color.Inherit" Variant="Variant.Text">
+                    <MudButton Href="/welcome">About</MudButton>
+                    <MudButton Href="/login">Login</MudButton>
+                </MudButtonGroup>
             </NotAuthorized>
         </AuthorizeView>
     </MudAppBar>
@@ -53,7 +66,15 @@
 
     private async Task Logout()
     {
-        // Logout logic will be implemented
-        await JSRuntime.InvokeVoidAsync("location.reload");
+        try
+        {
+            await AuthService.LogoutAsync();
+            Snackbar.Add("Logged out successfully", Severity.Success);
+            Navigation.NavigateTo("/welcome", true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error during logout: {ex.Message}", Severity.Error);
+        }
     }
 }

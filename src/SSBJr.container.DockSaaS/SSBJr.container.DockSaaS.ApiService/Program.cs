@@ -8,6 +8,9 @@ using SSBJr.container.DockSaaS.ApiService.Data;
 using SSBJr.container.DockSaaS.ApiService.Models;
 using SSBJr.container.DockSaaS.ApiService.Services;
 using System.Text;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using HealthChecks.UI.Client;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,8 +29,18 @@ builder.Services.AddControllers();
 
 // Configure Entity Framework with PostgreSQL
 builder.Services.AddDbContext<DockSaaSDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("postgres") 
-                      ?? builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    var connectionString = builder.Configuration.GetConnectionString("docksaasdb") 
+                          ?? builder.Configuration.GetConnectionString("postgres")
+                          ?? builder.Configuration.GetConnectionString("DefaultConnection");
+    
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        throw new InvalidOperationException("No database connection string found. Ensure Aspire is running or a fallback connection string is configured.");
+    }
+    
+    options.UseNpgsql(connectionString);
+});
 
 // Configure Identity
 builder.Services.AddIdentity<User, Role>(options =>
@@ -92,6 +105,11 @@ builder.Services.AddScoped<IServiceInstanceProviders, ServiceInstanceProviders>(
 builder.Services.AddHostedService<MetricsCollectionService>();
 builder.Services.AddHostedService<BillingProcessingService>();
 builder.Services.AddHostedService<NotificationService>();
+
+// Add health checks
+builder.Services.AddHealthChecks()
+    .AddCheck("api_service", () => HealthCheckResult.Healthy("API service is running"))
+    .AddDbContextCheck<DockSaaSDbContext>("database");
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -195,44 +213,91 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Add health checks
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
 
 // Ensure database is created and seeded
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<DockSaaSDbContext>();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<Role>>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
-    try
+    var skipOnFailure = configuration.GetValue<bool>("DatabaseInitialization:SkipOnConnectionFailure", true);
+    var retryCount = configuration.GetValue<int>("DatabaseInitialization:RetryCount", 3);
+    var retryDelay = configuration.GetValue<TimeSpan>("DatabaseInitialization:RetryDelay", TimeSpan.FromSeconds(5));
+
+    for (int attempt = 1; attempt <= retryCount; attempt++)
     {
-        await context.Database.MigrateAsync();
-
-        // Seed roles
-        string[] roles = { "Admin", "Manager", "User" };
-        foreach (var role in roles)
+        try
         {
-            if (!await roleManager.RoleExistsAsync(role))
+            logger.LogInformation("Starting database initialization attempt {Attempt}/{MaxAttempts}...", attempt, retryCount);
+            
+            // Check database connectivity first
+            await context.Database.CanConnectAsync();
+            logger.LogInformation("Database connection successful");
+            
+            await context.Database.MigrateAsync();
+            logger.LogInformation("Database migrations completed");
+
+            // Seed roles
+            string[] roles = { "Admin", "Manager", "User" };
+            foreach (var role in roles)
             {
-                await roleManager.CreateAsync(new Role
+                if (!await roleManager.RoleExistsAsync(role))
                 {
-                    Name = role,
-                    Description = $"{role} role with specific permissions"
-                });
+                    await roleManager.CreateAsync(new Role
+                    {
+                        Name = role,
+                        Description = $"{role} role with specific permissions"
+                    });
+                }
+            }
+
+            // Seed service definitions
+            await SeedServiceDefinitionsAsync(context);
+
+            // Seed pricing plans
+            await SeedPricingPlansAsync(context);
+
+            Log.Information("Database initialization completed successfully");
+            break; // Success, exit retry loop
+        }
+        catch (Exception ex)
+        {
+            var isLastAttempt = attempt == retryCount;
+            var isConnectionError = ex.InnerException is System.Net.Sockets.SocketException;
+            
+            Log.Error(ex, "Database initialization failed on attempt {Attempt}/{MaxAttempts}: {ErrorMessage}", 
+                attempt, retryCount, ex.Message);
+            
+            if (isConnectionError)
+            {
+                Log.Error("PostgreSQL connection failed. If using Aspire, ensure it's running with: dotnet run --project SSBJr.container.DockSaaS.AppHost");
+                Log.Error("If running standalone, ensure PostgreSQL is installed and running on localhost:5432");
+            }
+
+            if (isLastAttempt)
+            {
+                if (skipOnFailure && isConnectionError)
+                {
+                    Log.Warning("Skipping database initialization due to connection failure. Application will start but database features will not work.");
+                    break;
+                }
+                else
+                {
+                    throw;
+                }
+            }
+            else
+            {
+                Log.Information("Retrying database initialization in {Delay} seconds...", retryDelay.TotalSeconds);
+                await Task.Delay(retryDelay);
             }
         }
-
-        // Seed service definitions
-        await SeedServiceDefinitionsAsync(context);
-
-        // Seed pricing plans
-        await SeedPricingPlansAsync(context);
-
-        Log.Information("Database initialization completed successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Database initialization failed");
-        throw;
     }
 }
 

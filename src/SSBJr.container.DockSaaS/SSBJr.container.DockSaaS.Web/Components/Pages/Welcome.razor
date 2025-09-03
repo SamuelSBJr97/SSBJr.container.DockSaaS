@@ -1,0 +1,61 @@
+@page "/welcome"
+
+<PageTitle>Welcome - DockSaaS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
+    <div class="text-center">
+        <MudIcon Icon="Icons.Material.Filled.Cloud" Size="Size.Large" Color="Color.Primary" />
+        <MudText Typo="Typo.h3" Class="mt-4 mb-2">Welcome to DockSaaS</MudText>
+        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-6">
+            Your comprehensive SaaS platform for managing cloud-like services
+        </MudText>
+        
+        <MudCard Class="pa-8 mb-6">
+            <MudCardContent>
+                <MudText Typo="Typo.h5" Class="mb-4">?? Application is Running!</MudText>
+                <MudText Typo="Typo.body1" Class="mb-4">
+                    Your DockSaaS application is successfully running. You can now:
+                </MudText>
+                
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudIcon Icon="Icons.Material.Filled.Login" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6" Class="mt-2">Sign In</MudText>
+                            <MudText Typo="Typo.body2" Class="mb-3">
+                                Access your existing account
+                            </MudText>
+                            <MudButton Href="/login" Color="Color.Primary" Variant="Variant.Filled" FullWidth="true">
+                                Sign In
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+                    
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudIcon Icon="Icons.Material.Filled.PersonAdd" Color="Color.Success" />
+                            <MudText Typo="Typo.h6" Class="mt-2">Create Account</MudText>
+                            <MudText Typo="Typo.body2" Class="mb-3">
+                                Sign up for a new account
+                            </MudText>
+                            <MudButton Href="/login" Color="Color.Success" Variant="Variant.Filled" FullWidth="true">
+                                Sign Up
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+        
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            <strong>System Status:</strong> All services are operational
+        </MudAlert>
+        
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Environment: @Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Time: @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+        </MudText>
+    </div>
+</MudContainer>

@@ -3,4 +3,21 @@
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <div class="d-flex align-center justify-center" style="height: 60vh;">
+                <MudPaper Class="pa-8 text-center" Elevation="4">
+                    <MudIcon Icon="Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h4" Class="mt-4">Page Not Found</MudText>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                        Sorry, the page you're looking for doesn't exist.
+                    </MudText>
+                    <MudButton Href="/" Color="Color.Primary" Variant="Variant.Filled" StartIcon="Icons.Material.Filled.Home">
+                        Go Home
+                    </MudButton>
+                </MudPaper>
+            </div>
+        </LayoutView>
+    </NotFound>
 </Router>

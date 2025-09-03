@@ -1,328 +1,419 @@
-# DockSaaS - AWS-like Services Platform
+# DockSaaS - AWS-like SaaS Platform
 
-DockSaaS is a comprehensive SaaS platform that allows administrators to create and manage AWS-like services that can be dynamically instantiated and consumed via REST APIs. Built with .NET 8, Blazor Server, PostgreSQL, and Docker.
+![DockSaaS](https://img.shields.io/badge/DockSaaS-v1.0-blue)
+![.NET](https://img.shields.io/badge/.NET-8.0-purple)
+![Docker](https://img.shields.io/badge/Docker-Ready-blue)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## ?? Features
+DockSaaS é uma plataforma SaaS completa que permite aos administradores criar e gerenciar serviços similares aos da AWS de forma dinâmica e multi-tenant. A plataforma oferece provisionamento automático, cobrança baseada em uso, monitoramento em tempo real e muito mais.
 
-### Core Platform Features
-- **Multi-tenant Architecture**: Isolated tenant environments with quota management
-- **JWT Authentication**: Secure authentication with role-based access control (RBAC)
-- **OAuth2/SSO Support**: Integration with Google, Microsoft, and LDAP
-- **Responsive Blazor UI**: Modern, responsive web interface built with MudBlazor
+## ?? Características Principais
 
-### AWS-like Services
-The platform supports dynamic creation and management of the following service types:
+### ? **Arquitetura Multi-Tenant Completa**
+- Isolamento completo de dados entre tenants
+- Planos configuráveis (Free, Pro, Enterprise)
+- Gestão de quotas e limites por tenant
+- Branding personalizado por organização
 
-1. **S3-like Storage**: Object storage with configurable quotas and encryption
-2. **RDS-like Database**: Relational database instances with multi-engine support
-3. **DynamoDB-like NoSQL**: NoSQL database with configurable billing modes
-4. **SQS-like Queue**: Message queuing with configurable retention and visibility
-5. **Lambda-like Functions**: Serverless functions with runtime selection
-6. **CloudWatch-like Monitoring**: Metrics collection and real-time monitoring
-7. **IAM-like Control**: Granular access control and API key management
-8. **SNS-like Notifications**: Email, push, and webhook notifications
+### ? **Serviços AWS-like**
+- **S3-like Storage**: Armazenamento de objetos com buckets, versionamento e criptografia
+- **RDS-like Database**: Bancos relacionais gerenciados com backup automático
+- **DynamoDB-like NoSQL**: Banco NoSQL com capacidade configurável
+- **SQS-like Queue**: Sistema de filas para desacoplamento de aplicações
+- **Lambda-like Functions**: Computação serverless para execução de código
+- **CloudWatch-like Monitoring**: Monitoramento e métricas em tempo real
 
-### Management Features
-- **Real-time Dashboard**: Service metrics, usage statistics, and tenant overview
-- **Service Lifecycle Management**: Start, stop, configure, and monitor services
-- **Audit Logging**: Complete activity tracking and compliance reporting
-- **Usage Monitoring**: Resource consumption tracking with quota enforcement
-- **API Management**: Automatic REST/GraphQL API generation for external consumption
+### ? **Sistema de Cobrança Avançado**
+- Cobrança baseada em uso real
+- Três tiers de preço (Free, Pro, Enterprise)
+- Alertas automáticos de quota (80%, 95%)
+- Histórico detalhado de uso (90 dias)
+- Previsão de custos mensais
 
-## ??? Architecture
+### ? **Interface Moderna**
+- Blazor Server com MudBlazor
+- Dashboard em tempo real
+- Gerenciamento completo de serviços
+- Administração de usuários e permissões
+- Logs de auditoria com filtros avançados
 
-```
-???????????????????    ???????????????????    ???????????????????
-?   Blazor Web    ??????   API Service   ??????   PostgreSQL    ?
-?   (Frontend)    ?    ?   (Backend)     ?    ?   (Database)    ?
-???????????????????    ???????????????????    ???????????????????
-                              ?
-                       ???????????????????
-                       ?      Redis      ?
-                       ?   (Caching)     ?
-                       ???????????????????
-```
+### ? **Pronto para Produção**
+- Docker e Kubernetes ready
+- Health checks integrados
+- Logging estruturado com Serilog
+- Background services para métricas
+- CI/CD ready com scripts automatizados
 
-## ??? Technology Stack
+## ?? Pré-requisitos
 
-- **Frontend**: Blazor Server, MudBlazor UI Components
-- **Backend**: ASP.NET Core 8, Minimal APIs
-- **Database**: PostgreSQL with Entity Framework Core
-- **Caching**: Redis (via .NET Aspire)
-- **Authentication**: JWT, ASP.NET Core Identity
-- **Containerization**: Docker & Docker Compose
-- **Orchestration**: .NET Aspire for development
+### Para Desenvolvimento
+- .NET 8 SDK
+- Docker Desktop
+- Visual Studio 2022 ou VS Code
+- 4GB RAM
+- 10GB espaço em disco
 
-## ?? Prerequisites
-
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop)
-- [PostgreSQL](https://www.postgresql.org/download/) (for local development)
-- [Visual Studio 2022](https://visualstudio.microsoft.com/) or [VS Code](https://code.visualstudio.com/)
+### Para Produção
+- Docker e Docker Compose
+- Kubernetes (opcional)
+- PostgreSQL 15+
+- Redis 7+
+- 8GB RAM recomendado
+- 20GB espaço em disco
 
 ## ?? Quick Start
 
-### Option 1: Docker Compose (Recommended)
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/SamuelSBJr97/SSBjr.container.DockSaaS.git
-   cd SSBjr.container.DockSaaS
-   ```
-
-2. **Start all services**
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Access the application**
-   - Web Interface: http://localhost:5001
-   - API Documentation: http://localhost:5000/swagger
-
-### Option 2: Local Development with .NET Aspire
-
-1. **Clone and restore packages**
-   ```bash
-   git clone https://github.com/SamuelSBJr97/SSBjr.container.DockSaaS.git
-   cd SSBjr.container.DockSaaS/src/SSBjr.container.DockSaaS
-   dotnet restore
-   ```
-
-2. **Start PostgreSQL and Redis**
-   ```bash
-   docker run -d --name postgres -p 5432:5432 -e POSTGRES_DB=docksaas -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres postgres:15
-   docker run -d --name redis -p 6379:6379 redis:7-alpine
-   ```
-
-3. **Run the application**
-   ```bash
-   dotnet run --project SSBJr.container.DockSaaS.AppHost
-   ```
-
-4. **Access via Aspire Dashboard**
-   - Aspire Dashboard: https://localhost:15888
-   - Web Interface: https://localhost:7001
-   - API Service: https://localhost:7000
-
-## ?? Usage Guide
-
-### Getting Started
-
-1. **Create Account**: Navigate to the web interface and register a new account
-2. **Tenant Setup**: Your first registration automatically creates a tenant and assigns you admin role
-3. **Dashboard**: Access the dashboard to view tenant statistics and service overview
-
-### Creating Services
-
-1. **Navigate to Services**: Use the sidebar menu to access "Services > Create Service"
-2. **Select Service Type**: Choose from available AWS-like services (S3, RDS, DynamoDB, etc.)
-3. **Configure Service**: Set name, quotas, and service-specific configuration
-4. **Deploy**: Click "Create Service" to instantiate the service
-
-### Managing Services
-
-- **Start/Stop**: Control service lifecycle from the services list or dashboard
-- **Monitor**: View real-time metrics and usage statistics
-- **Configure**: Modify service settings and quotas
-- **API Access**: Each service automatically gets a REST endpoint and API key
-
-### API Consumption
-
-Each service instance generates endpoints for external consumption:
-
+### 1. **Clone o Repositório**
 ```bash
-# Example: S3-like Storage Service
-curl -X POST "https://api.docksaas.local/s3storage/{tenant-id}/{service-id}/upload" \
-  -H "Authorization: Bearer {api-key}" \
-  -F "file=@document.pdf"
-
-# Example: Queue Service
-curl -X POST "https://api.docksaas.local/queue/{tenant-id}/{service-id}/send" \
-  -H "Authorization: Bearer {api-key}" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello World"}'
+git clone https://github.com/SamuelSBJr97/SSBJr.container.DockSaaS.git
+cd SSBJr.container.DockSaaS
 ```
 
-## ?? Configuration
-
-### Environment Variables
-
-#### API Service
+### 2. **Desenvolvimento Rápido (.NET Aspire)**
 ```bash
-ASPNETCORE_ENVIRONMENT=Development
-ConnectionStrings__DefaultConnection=Host=localhost;Database=docksaas;Username=postgres;Password=postgres
-JwtSettings__Secret=YourSecretKey
-JwtSettings__Issuer=DockSaaS
-JwtSettings__Audience=DockSaaS-Users
+# Linux/Mac
+chmod +x deploy.sh
+./deploy.sh dev
+
+# Windows
+deploy.bat dev
+
+# Executar aplicação
+dotnet run --project SSBJr.container.DockSaaS.AppHost
 ```
 
-#### Web Application
+**URLs de Desenvolvimento:**
+- ?? **Aspire Dashboard**: https://localhost:15888
+- ?? **Web Interface**: https://localhost:7001
+- ?? **API Swagger**: https://localhost:7000/swagger
+- ?? **pgAdmin**: http://localhost:8080
+
+### 3. **Produção Docker**
 ```bash
-ASPNETCORE_ENVIRONMENT=Development
-ApiSettings__BaseUrl=https://localhost:7000
+# Build e Deploy completo
+./deploy.sh prod
+
+# OU apenas build
+./deploy.sh build
+docker-compose up -d
 ```
 
-### Database Migration
+**URLs de Produção:**
+- ?? **Web Interface**: http://localhost:3000
+- ?? **API Swagger**: http://localhost:5000/swagger
+- ?? **pgAdmin**: http://localhost:8080
+- ?? **Redis Commander**: http://localhost:8081
 
-The application automatically runs migrations on startup. For manual migration:
-
+### 4. **Deploy Kubernetes**
 ```bash
-cd SSBJr.container.DockSaaS.ApiService
-dotnet ef database update
+# Deploy completo no K8s
+./deploy.sh k8s
+
+# Adicionar ao hosts file
+echo "127.0.0.1 docksaas.local" | sudo tee -a /etc/hosts
 ```
 
-## ?? Testing
+**URLs Kubernetes:**
+- ?? **Web Interface**: http://docksaas.local
+- ?? **API Swagger**: http://docksaas.local/api/swagger
 
-### Running Tests
+## ??? Comandos Úteis
+
+### **Script de Deploy Unificado**
 ```bash
+# Verificar dependências
+./deploy.sh check
+
+# Limpar ambiente
+./deploy.sh clean
+
+# Build completo
+./deploy.sh build
+
+# Status dos serviços
+./deploy.sh status
+
+# Ver logs
+./deploy.sh logs          # Todos os serviços
+./deploy.sh logs api      # Apenas API
+
+# Parar tudo
+./deploy.sh stop
+
+# Ajuda
+./deploy.sh help
+```
+
+### **Docker Compose Manual**
+```bash
+# Desenvolvimento
+docker-compose -f docker-compose.dev.yml up -d
+
+# Produção
+docker-compose up -d
+
+# Logs
+docker-compose logs -f
+docker-compose logs -f docksaas-api
+
+# Parar
+docker-compose down
+```
+
+### **Kubernetes Manual**
+```bash
+# Deploy
+kubectl apply -f k8s/infrastructure.yaml
+kubectl apply -f k8s/applications.yaml
+
+# Status
+kubectl get pods -n docksaas
+kubectl get services -n docksaas
+
+# Logs
+kubectl logs -f deployment/docksaas-api -n docksaas
+
+# Limpar
+kubectl delete namespace docksaas
+```
+
+## ??? Arquitetura
+
+### **Componentes Principais**
+```
+???????????????????    ???????????????????    ???????????????????
+?   Blazor Web    ?    ?   API Service   ?    ?   PostgreSQL    ?
+?   (Port 7001)   ??????   (Port 7000)   ??????   (Port 5432)   ?
+???????????????????    ???????????????????    ???????????????????
+         ?                       ?                       ?
+         ?????????????????????????????????????????????????
+                                 ?
+                    ???????????????????
+                    ?      Redis      ?
+                    ?   (Port 6379)   ?
+                    ???????????????????
+```
+
+### **Tecnologias Utilizadas**
+- **Backend**: ASP.NET Core 8, Entity Framework Core, PostgreSQL
+- **Frontend**: Blazor Server, MudBlazor
+- **Cache**: Redis
+- **Orquestração**: .NET Aspire
+- **Containerização**: Docker, Kubernetes
+- **Monitoramento**: Health Checks, Serilog
+- **Testes**: XUnit, MSTest
+
+## ?? Funcionalidades Detalhadas
+
+### **1. Gerenciamento de Serviços**
+- Criação dinâmica de instâncias de serviço
+- Configuração via JSON Schema
+- Start/Stop de serviços
+- Monitoramento de saúde
+- Backup e restore
+
+### **2. Sistema de Cobrança**
+- Planos: Free (1GB), Pro (100GB), Enterprise (1TB)
+- Métricas: Storage, API calls, DB queries, Functions, Queue messages
+- Alertas automáticos de quota
+- Relatórios de uso
+
+### **3. Multi-Tenant**
+- Isolamento completo de dados
+- Configurações por tenant
+- Convites de usuários
+- Roles: Admin, Manager, User
+
+### **4. API Gateway**
+- Endpoints dinâmicos por serviço
+- Autenticação JWT + API Keys
+- Rate limiting
+- Documentação Swagger automática
+
+### **5. Monitoramento**
+- Métricas em tempo real
+- Logs de auditoria
+- Health checks
+- Alertas configuráveis
+
+## ?? Segurança
+
+### **Autenticação e Autorização**
+- JWT tokens com refresh
+- Role-based access control (RBAC)
+- API Keys com scoping
+- IP whitelisting
+
+### **Isolamento de Dados**
+- Schema separation no PostgreSQL
+- Tenant-specific API keys
+- Audit trail completo
+
+### **Produção Security**
+- HTTPS obrigatório
+- Secrets management
+- Non-root containers
+- Network policies (K8s)
+
+## ?? Monitoramento e Observabilidade
+
+### **Health Checks**
+```bash
+# API Health
+curl http://localhost:5000/health
+
+# Web Health  
+curl http://localhost:3000/health
+
+# Detailed JSON response
+curl -H "Accept: application/json" http://localhost:5000/health
+```
+
+### **Métricas Disponíveis**
+- CPU, Memory, Storage usage
+- API request rates
+- Database connections
+- Queue message counts
+- Function invocations
+
+### **Logs Estruturados**
+```bash
+# API logs
+docker logs docksaas-api -f
+
+# Web logs
+docker logs docksaas-web -f
+
+# Structured JSON logs
+docker logs docksaas-api --since=1h | jq .
+```
+
+## ?? Testes
+
+### **Executar Testes**
+```bash
+# Todos os testes
+dotnet test
+
+# Com cobertura
+dotnet test --collect:"XPlat Code Coverage"
+
+# Específico
 dotnet test SSBJr.container.DockSaaS.Tests
 ```
 
-### API Testing
-Use the included Swagger UI at `/swagger` endpoint for interactive API testing.
+### **Testes Incluídos**
+- Unit tests para services
+- Integration tests com Aspire
+- API endpoint tests
+- Database tests
 
-### Service Testing Examples
+## ?? Configuração
 
-```bash
-# Test S3-like Storage
-curl -X GET "http://localhost:5000/api/services/instances" \
-  -H "Authorization: Bearer {your-jwt-token}"
+### **Variáveis de Ambiente**
 
-# Test Service Creation
-curl -X POST "http://localhost:5000/api/services/instances" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "my-storage",
-    "serviceDefinitionId": "11111111-1111-1111-1111-111111111111",
-    "configuration": "{\"bucketName\":\"my-bucket\",\"encryption\":true}",
-    "usageQuota": 1073741824
-  }'
+#### **API Service**
+```env
+ASPNETCORE_ENVIRONMENT=Production
+ConnectionStrings__DefaultConnection=Host=postgres;Database=docksaasdb;Username=postgres;Password=postgres
+ConnectionStrings__Redis=redis:6379
+JwtSettings__Secret=your-secret-key
+JwtSettings__Issuer=DockSaaS
+JwtSettings__Audience=DockSaaSUsers
+ServiceEndpoints__BaseUrl=http://api:8080
 ```
 
-## ?? Deployment
-
-### Production Docker Deployment
-
-1. **Build production images**
-   ```bash
-   docker-compose -f docker-compose.prod.yml build
-   ```
-
-2. **Deploy with production configuration**
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d
-   ```
-
-### Kubernetes Deployment
-Kubernetes manifests are available in the `/k8s` directory:
-
-```bash
-kubectl apply -f k8s/
+#### **Web Service**
+```env
+ASPNETCORE_ENVIRONMENT=Production
+ApiBaseUrl=http://api:8080
+ConnectionStrings__Redis=redis:6379
 ```
 
-### Environment-specific Configurations
-- Development: `appsettings.Development.json`
-- Staging: `appsettings.Staging.json`
-- Production: `appsettings.Production.json`
+### **Customização**
 
-## ?? Monitoring & Observability
+#### **Adicionar Novo Tipo de Serviço**
+1. Criar provider em `Services/ServiceProviders.cs`
+2. Implementar `IServiceProvider`
+3. Registrar no DI container
+4. Adicionar configuração no seeder
 
-### Built-in Monitoring
-- **Service Metrics**: CPU, memory, storage usage per service
-- **Tenant Analytics**: Usage statistics and quota tracking
-- **Audit Logs**: Complete activity tracking with filtering
-- **Real-time Dashboard**: Live metrics and service status
+#### **Modificar Planos de Cobrança**
+1. Editar `BillingService.cs`
+2. Atualizar `InitializePricingTiers()`
+3. Executar migração se necessário
 
-### External Monitoring Integration
-The platform supports integration with:
-- Prometheus/Grafana for metrics
-- ELK Stack for log aggregation
-- Application Insights for application monitoring
+## ?? Documentação da API
 
-## ?? Security
+### **Endpoints Principais**
 
-### Authentication & Authorization
-- JWT-based authentication with configurable expiration
-- Role-based access control (Admin, Manager, User)
-- OAuth2 integration for enterprise SSO
-- API key management for service access
+#### **Autenticação**
+```bash
+POST /api/auth/register  # Registrar usuário
+POST /api/auth/login     # Login
+POST /api/auth/refresh   # Refresh token
+```
 
-### Data Security
-- Multi-tenant data isolation
-- Encrypted sensitive configuration
-- Audit logging for compliance
-- Rate limiting and quota enforcement
+#### **Serviços**
+```bash
+GET    /api/services              # Listar serviços
+POST   /api/services              # Criar serviço
+GET    /api/services/{id}         # Detalhes do serviço
+PUT    /api/services/{id}         # Atualizar serviço
+DELETE /api/services/{id}         # Deletar serviço
+POST   /api/services/{id}/start   # Iniciar serviço
+POST   /api/services/{id}/stop    # Parar serviço
+```
 
-## ?? Contributing
+#### **Cobrança**
+```bash
+GET /api/billing/usage         # Uso atual
+GET /api/billing/quotas        # Quotas do tenant
+GET /api/billing/alerts        # Alertas de cobrança
+GET /api/billing/bill/{y}/{m}  # Fatura mensal
+```
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+### **Documentação Swagger**
+Acesse `/swagger` em qualquer ambiente para documentação interativa completa.
 
-### Development Guidelines
-- Follow C# coding conventions
-- Write unit tests for new features
-- Update documentation for API changes
-- Ensure Docker builds pass
+## ?? Roadmap
+
+### **Próximas Funcionalidades**
+- [ ] GraphQL API
+- [ ] Mobile app (Blazor Hybrid)
+- [ ] Advanced analytics
+- [ ] Marketplace de templates
+- [ ] Multi-region deployment
+- [ ] CDN integration
+
+### **Melhorias de Infraestrutura**
+- [ ] Prometheus/Grafana monitoring
+- [ ] ELK stack para logs
+- [ ] GitOps com ArgoCD
+- [ ] Disaster recovery automation
+- [ ] Performance optimizations
+
+## ?? Contribuindo
+
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
 
 ## ?? License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Distribuído sob a licença MIT. Veja `LICENSE` para mais informações.
 
-## ?? Support
+## ?? Suporte
 
-- **Documentation**: [Wiki](https://github.com/SamuelSBJr97/SSBjr.container.DockSaaS/wiki)
-- **Issues**: [GitHub Issues](https://github.com/SamuelSBJr97/SSBjr.container.DockSaaS/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/SamuelSBJr97/SSBjr.container.DockSaaS/discussions)
-- **Email**: support@docksaas.com
-
-## ??? Roadmap
-
-### Phase 1 (Current)
-- ? Core platform infrastructure
-- ? Basic AWS-like services
-- ? Multi-tenant support
-- ? Blazor web interface
-
-### Phase 2 (Next)
-- [ ] Advanced service configurations
-- [ ] Service templates and marketplace
-- [ ] Enhanced monitoring and alerting
-- [ ] GraphQL API support
-- [ ] Mobile responsive improvements
-
-### Phase 3 (Future)
-- [ ] Multi-cloud provider support
-- [ ] Advanced analytics and reporting
-- [ ] Service mesh integration
-- [ ] Kubernetes operator
-- [ ] Plugin system for custom services
-
-## ?? Architecture Decisions
-
-### Why Blazor Server?
-- Real-time updates with SignalR
-- Rich client-side interactions
-- Server-side rendering for SEO
-- Shared code between client and server
-
-### Why PostgreSQL?
-- Advanced JSON support for configuration
-- Excellent performance for multi-tenant scenarios
-- Strong ACID compliance
-- Rich extension ecosystem
-
-### Why .NET Aspire?
-- Simplified local development experience
-- Built-in observability and service discovery
-- Container orchestration for development
-- Production-ready deployment patterns
+- **Issues**: [GitHub Issues](https://github.com/SamuelSBJr97/SSBJr.container.DockSaaS/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/SamuelSBJr97/SSBJr.container.DockSaaS/discussions)
+- **Email**: samuel@docksaas.com
 
 ---
 
-**DockSaaS** - Empowering developers with cloud-native service management platform.
+**DockSaaS** - Construindo o futuro das plataformas SaaS ??
 
 Made with ?? by [Samuel da Silva B Jr](https://github.com/SamuelSBJr97)
