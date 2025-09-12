@@ -47,7 +47,7 @@ services:
   docksaas-api:
     build:
       context: .
-      dockerfile: SSBJr.container.DockSaaS.ApiService/Dockerfile
+      dockerfile: SSBJr.DockSaaS.ApiService/Dockerfile
       args:
         BUILD_CONFIGURATION: Release
     container_name: docksaas-api
@@ -90,7 +90,7 @@ services:
   docksaas-web:
     build:
       context: .
-      dockerfile: SSBJr.container.DockSaaS.Web/Dockerfile
+      dockerfile: SSBJr.DockSaaS.Web/Dockerfile
       args:
         BUILD_CONFIGURATION: Release
     container_name: docksaas-web
