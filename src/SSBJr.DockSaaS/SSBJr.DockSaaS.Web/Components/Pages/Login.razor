@@ -3,6 +3,8 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthStateProvider
+@inject ApiClient ApiClient
+@inject ILogger<Login> Logger
 
 <MudContainer Component="main" MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center mud-height-full">
     <MudPaper Elevation="25" Class="pa-8" Style="width: 100%; max-width: 400px;">
@@ -14,6 +16,13 @@
             <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">
                 @(isRegister ? "Create Account" : "Sign In")
             </MudText>
+
+            @if (!string.IsNullOrEmpty(apiConnectionStatus))
+            {
+                <MudAlert Severity="@(apiConnectionStatus.Contains("?") ? Severity.Success : Severity.Warning)" Class="mb-3">
+                    @apiConnectionStatus
+                </MudAlert>
+            }
 
             @if (isRegister)
             {
@@ -80,6 +89,16 @@
                               HelperText="Leave empty to use default tenant" />
             }
 
+            @if (!isRegister)
+            {
+                <MudButton Variant="Variant.Text" 
+                           Size="Size.Small" 
+                           OnClick="PopulateDefaultCredentials"
+                           Class="mb-3">
+                    Use Default Admin Credentials
+                </MudButton>
+            }
+
             <MudButton ButtonType="ButtonType.Submit"
                        Variant="Variant.Filled"
                        Color="Color.Primary"
@@ -107,6 +126,15 @@
                        OnClick="ToggleMode">
                 @(isRegister ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
             </MudButton>
+
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Secondary"
+                       Size="Size.Small"
+                       FullWidth="true"
+                       OnClick="TestApiConnection"
+                       Class="mt-2">
+                Test API Connection
+            </MudButton>
         </MudForm>
     </MudPaper>
 </MudContainer>
@@ -116,9 +144,56 @@
     private bool success = false;
     private bool isLoading = false;
     private bool isRegister = false;
+    private string apiConnectionStatus = "";
 
     private LoginRequest loginRequest = new();
     private RegisterRequest registerRequest = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TestApiConnection();
+    }
+
+    private void PopulateDefaultCredentials()
+    {
+        loginRequest.Email = "admin@docksaas.com";
+        loginRequest.Password = "Admin123!";
+        loginRequest.TenantName = "";
+        
+        Logger.LogInformation("Default credentials populated");
+        Snackbar.Add("Default admin credentials loaded", Severity.Info);
+    }
+
+    private async Task TestApiConnection()
+    {
+        try
+        {
+            Logger.LogInformation("Testing API connection...");
+            apiConnectionStatus = "?? Testing API connection...";
+            StateHasChanged();
+
+            // Use the new health check method that doesn't try to deserialize JSON
+            var isHealthy = await ApiClient.CheckHealthAsync();
+            
+            if (isHealthy)
+            {
+                apiConnectionStatus = "? API connection successful";
+                Logger.LogInformation("API connection test successful");
+            }
+            else
+            {
+                apiConnectionStatus = "?? API connection failed - check if API is running on https://localhost:7000";
+                Logger.LogWarning("API connection test failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            apiConnectionStatus = $"? API connection error: {ex.Message}";
+            Logger.LogError(ex, "API connection test error");
+        }
+        
+        StateHasChanged();
+    }
 
     private async Task HandleSubmit()
     {
@@ -129,6 +204,8 @@
 
         try
         {
+            Logger.LogInformation("Starting {Action} process", isRegister ? "registration" : "login");
+
             if (isRegister)
             {
                 result = await AuthService.RegisterAsync(registerRequest);
@@ -151,6 +228,7 @@
                 else
                 {
                     Snackbar.Add("Registration failed. Please check your information and try again.", Severity.Error);
+                    Logger.LogWarning("Registration failed for user {Email}", registerRequest.Email);
                 }
             }
             else
@@ -175,12 +253,21 @@
                 else
                 {
                     Snackbar.Add("Login failed. Please check your credentials and try again.", Severity.Error);
+                    Logger.LogWarning("Login failed for user {Email}", loginRequest.Email);
+                    
+                    // Test API connection again if login fails
+                    await TestApiConnection();
                 }
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"An error occurred: {ex.Message}", Severity.Error);
+            var errorMessage = $"An error occurred: {ex.Message}";
+            Snackbar.Add(errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error during {Action}", isRegister ? "registration" : "login");
+            
+            // Test API connection again if there's an exception
+            await TestApiConnection();
         }
         finally
         {
@@ -194,5 +281,7 @@
         // Reset forms
         loginRequest = new();
         registerRequest = new();
+        
+        Logger.LogInformation("Toggled to {Mode} mode", isRegister ? "registration" : "login");
     }
 }

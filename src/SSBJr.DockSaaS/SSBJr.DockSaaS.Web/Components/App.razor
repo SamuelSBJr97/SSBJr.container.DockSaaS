@@ -20,68 +20,136 @@
     
     <!-- Application CSS -->
     <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="css/dashboard.css" />
     <link rel="stylesheet" href="SSBJr.DockSaaS.Web.styles.css" />
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png" />
     
     <HeadOutlet />
-    
-    <style>
-        @@keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
 </head>
 
 <body>
     <Routes />
     
     <!-- Loading overlay for better UX -->
-    <div id="loading-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+    <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner">
-            <div style="text-align: center;">
-                <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #594ae2; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
-                <p style="margin-top: 10px; color: #666;">Loading DockSaaS...</p>
-            </div>
+            <div class="spinner"></div>
+            <p>Loading DockSaaS...</p>
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts loaded in correct order -->
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
-    <script src="_content/Blazored.LocalStorage/blazored-localstorage.js"></script>
     
-    <!-- Dashboard Charts -->
+    <!-- Only load Blazored LocalStorage if the package exists -->
+    <script>
+        // Check if Blazored LocalStorage is available before loading
+        var blazoredScript = document.createElement('script');
+        blazoredScript.src = '_content/Blazored.LocalStorage/blazored-localstorage.js';
+        blazoredScript.onerror = function() {
+            console.warn('Blazored LocalStorage script not found - this is normal if the package is not installed');
+        };
+        blazoredScript.onload = function() {
+            console.log('Blazored LocalStorage loaded successfully');
+        };
+        document.head.appendChild(blazoredScript);
+    </script>
+    
+    <!-- Dashboard Charts - load after other dependencies -->
     <script src="js/dashboard-charts.js"></script>
     
-    <!-- Hide loading overlay when page is loaded -->
+    <!-- Application initialization -->
     <script>
+        // Hide loading overlay when Blazor is ready
+        if (typeof Blazor !== 'undefined') {
+            Blazor.addEventListener('enhancedload', function () {
+                console.log('Blazor enhanced load complete');
+                hideLoadingOverlay();
+            });
+        }
+
+        // Fallback for older Blazor versions
         window.addEventListener('load', function() {
+            console.log('Window load complete');
+            setTimeout(hideLoadingOverlay, 1000);
+        });
+
+        function hideLoadingOverlay() {
             const loadingOverlay = document.getElementById('loading-overlay');
             if (loadingOverlay) {
-                loadingOverlay.style.display = 'none';
+                loadingOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                }, 300);
             }
-        });
+        }
 
         // Show loading overlay during navigation
         window.blazorNavigating = function() {
             const loadingOverlay = document.getElementById('loading-overlay');
             if (loadingOverlay) {
                 loadingOverlay.style.display = 'flex';
+                loadingOverlay.style.opacity = '1';
             }
         };
 
         // Hide loading overlay after navigation
         window.blazorNavigated = function() {
-            setTimeout(() => {
-                const loadingOverlay = document.getElementById('loading-overlay');
-                if (loadingOverlay) {
-                    loadingOverlay.style.display = 'none';
-                }
-            }, 500);
+            setTimeout(hideLoadingOverlay, 500);
         };
+
+        // Initialize charts when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Content Loaded');
+            
+            // Wait for Chart.js to be available
+            function initCharts() {
+                if (typeof Chart !== 'undefined' && window.initializeCharts) {
+                    console.log('Initializing charts...');
+                    window.initializeCharts();
+                } else {
+                    console.log('Waiting for Chart.js to load...');
+                    setTimeout(initCharts, 100);
+                }
+            }
+            
+            setTimeout(initCharts, 500);
+        });
+
+        // Error handling for uncaught JavaScript errors
+        window.addEventListener('error', function(e) {
+            // Don't show errors for known harmless issues
+            if (e.error && e.error.message) {
+                const message = e.error.message.toLowerCase();
+                if (message.includes('message port closed') || 
+                    message.includes('blazored-localstorage') ||
+                    message.includes('localstorage') ||
+                    message.includes('the message port closed before a response was received')) {
+                    // These are usually harmless - just log them
+                    console.warn('Non-critical error ignored:', message);
+                    return;
+                }
+            }
+            console.error('JavaScript error:', e.error);
+        });
+
+        // Handle unhandled promise rejections
+        window.addEventListener('unhandledrejection', function(e) {
+            const reason = e.reason ? e.reason.toString() : '';
+            if (reason.includes('message port closed') || 
+                reason.includes('localstorage') ||
+                reason.includes('the message port closed before a response was received')) {
+                console.warn('Non-critical promise rejection ignored:', reason);
+                e.preventDefault();
+                return;
+            }
+            console.warn('Unhandled promise rejection:', e.reason);
+        });
+
+        console.log('DockSaaS Dashboard initialized successfully');
     </script>
 </body>
 

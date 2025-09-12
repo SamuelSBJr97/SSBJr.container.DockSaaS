@@ -147,6 +147,25 @@ public class MetricsCollectionService : BackgroundService
                 metrics["memory_used_mb"] = random.NextDouble() * 512;
                 break;
 
+            case "Kafka":
+                metrics["messages_produced"] = random.Next(1000, 50000);
+                metrics["messages_consumed"] = random.Next(800, 45000);
+                metrics["bytes_in_per_sec"] = random.Next(1024, 1024 * 1024 * 10); // 1KB to 10MB
+                metrics["bytes_out_per_sec"] = random.Next(1024, 1024 * 1024 * 8); // 1KB to 8MB
+                metrics["total_log_size_bytes"] = random.NextInt64(1024 * 1024, 1024L * 1024 * 1024 * 10); // 1MB to 10GB
+                metrics["active_controller_count"] = 1;
+                metrics["offline_partitions"] = random.Next(0, 3);
+                metrics["under_replicated_partitions"] = random.Next(0, 2);
+                metrics["consumer_lag_sum"] = random.Next(0, 10000);
+                metrics["request_rate"] = random.Next(50, 5000);
+                metrics["response_rate"] = random.Next(45, 4800);
+                metrics["network_requests_per_sec"] = random.Next(100, 2000);
+                metrics["cpu_utilization"] = random.NextDouble() * 100;
+                metrics["memory_utilization"] = random.NextDouble() * 100;
+                metrics["disk_utilization"] = random.NextDouble() * 80;
+                metrics["jvm_heap_used_percent"] = random.NextDouble() * 90;
+                break;
+
             default:
                 // Generic metrics for unknown service types
                 metrics["cpu_utilization"] = random.NextDouble() * 100;
@@ -183,6 +202,21 @@ public class MetricsCollectionService : BackgroundService
             "duration_ms" => "ms",
             "error_count" => "count",
             "memory_used_mb" => "mb",
+            // Kafka-specific metrics
+            "messages_produced" => "count",
+            "messages_consumed" => "count",
+            "bytes_in_per_sec" => "bytes/sec",
+            "bytes_out_per_sec" => "bytes/sec",
+            "total_log_size_bytes" => "bytes",
+            "active_controller_count" => "count",
+            "offline_partitions" => "count",
+            "under_replicated_partitions" => "count",
+            "consumer_lag_sum" => "count",
+            "request_rate" => "rps",
+            "response_rate" => "rps",
+            "network_requests_per_sec" => "rps",
+            "disk_utilization" => "percent",
+            "jvm_heap_used_percent" => "percent",
             _ => "unit"
         };
     }

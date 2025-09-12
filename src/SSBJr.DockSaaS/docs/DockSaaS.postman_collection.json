@@ -1,0 +1,676 @@
+{
+  "info": {
+    "name": "DockSaaS API Collection",
+    "description": "Complete API collection for DockSaaS AWS-like services",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://localhost:7000",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenant_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "service_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('jwt_token', response.token);",
+                  "    pm.collectionVariables.set('tenant_id', response.user.tenantId);",
+                  "    console.log('Token saved:', response.token);",
+                  "    console.log('Tenant ID saved:', response.user.tenantId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@docksaas.com\",\n    \"password\": \"Admin123!\",\n    \"tenantName\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Services Management",
+      "item": [
+        {
+          "name": "List Service Definitions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/services/definitions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "services", "definitions"]
+            }
+          }
+        },
+        {
+          "name": "Create Service Instance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('service_id', response.id);",
+                  "    pm.collectionVariables.set('api_key', response.apiKey);",
+                  "    console.log('Service ID saved:', response.id);",
+                  "    console.log('API Key saved:', response.apiKey);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"test-s3-storage\",\n    \"serviceDefinitionId\": \"{{s3_definition_id}}\",\n    \"configuration\": \"{\\\"bucketName\\\": \\\"test-bucket\\\", \\\"encryption\\\": true}\",\n    \"usageQuota\": 10737418240\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/services/instances",
+              "host": ["{{base_url}}"],
+              "path": ["api", "services", "instances"]
+            }
+          }
+        },
+        {
+          "name": "List Service Instances",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/services/instances",
+              "host": ["{{base_url}}"],
+              "path": ["api", "services", "instances"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "S3 Storage",
+      "item": [
+        {
+          "name": "List Buckets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/s3storage/{{tenant_id}}/{{service_id}}/buckets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "s3storage", "{{tenant_id}}", "{{service_id}}", "buckets"]
+            }
+          }
+        },
+        {
+          "name": "Create Bucket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"documents\",\n    \"versioning\": true,\n    \"encryption\": true,\n    \"publicAccess\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/s3storage/{{tenant_id}}/{{service_id}}/buckets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "s3storage", "{{tenant_id}}", "{{service_id}}", "buckets"]
+            }
+          }
+        },
+        {
+          "name": "Get Storage Usage",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/s3storage/{{tenant_id}}/{{service_id}}/usage",
+              "host": ["{{base_url}}"],
+              "path": ["api", "s3storage", "{{tenant_id}}", "{{service_id}}", "usage"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "RDS Database",
+      "item": [
+        {
+          "name": "Get Database Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/rdsdatabase/{{tenant_id}}/{{service_id}}/info",
+              "host": ["{{base_url}}"],
+              "path": ["api", "rdsdatabase", "{{tenant_id}}", "{{service_id}}", "info"]
+            }
+          }
+        },
+        {
+          "name": "Execute Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"query\": \"SELECT * FROM users LIMIT 10\",\n    \"parameters\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/rdsdatabase/{{tenant_id}}/{{service_id}}/query",
+              "host": ["{{base_url}}"],
+              "path": ["api", "rdsdatabase", "{{tenant_id}}", "{{service_id}}", "query"]
+            }
+          }
+        },
+        {
+          "name": "List Tables",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/rdsdatabase/{{tenant_id}}/{{service_id}}/tables",
+              "host": ["{{base_url}}"],
+              "path": ["api", "rdsdatabase", "{{tenant_id}}", "{{service_id}}", "tables"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "NoSQL Database",
+      "item": [
+        {
+          "name": "List Tables",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/nosqldatabase/{{tenant_id}}/{{service_id}}/tables",
+              "host": ["{{base_url}}"],
+              "path": ["api", "nosqldatabase", "{{tenant_id}}", "{{service_id}}", "tables"]
+            }
+          }
+        },
+        {
+          "name": "Create Table",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tableName\": \"products\",\n    \"keySchema\": [\n        {\n            \"attributeName\": \"id\",\n            \"keyType\": \"HASH\"\n        }\n    ],\n    \"attributeDefinitions\": [\n        {\n            \"attributeName\": \"id\",\n            \"attributeType\": \"S\"\n        }\n    ],\n    \"provisionedThroughput\": {\n        \"readCapacityUnits\": 5,\n        \"writeCapacityUnits\": 5\n    }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/nosqldatabase/{{tenant_id}}/{{service_id}}/tables",
+              "host": ["{{base_url}}"],
+              "path": ["api", "nosqldatabase", "{{tenant_id}}", "{{service_id}}", "tables"]
+            }
+          }
+        },
+        {
+          "name": "Put Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"item\": {\n        \"id\": {\"S\": \"product-123\"},\n        \"name\": {\"S\": \"Notebook\"},\n        \"price\": {\"N\": \"2500.00\"},\n        \"active\": {\"BOOL\": true}\n    }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/nosqldatabase/{{tenant_id}}/{{service_id}}/tables/products/items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "nosqldatabase", "{{tenant_id}}", "{{service_id}}", "tables", "products", "items"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Queue Service",
+      "item": [
+        {
+          "name": "List Queues",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/queue/{{tenant_id}}/{{service_id}}/queues",
+              "host": ["{{base_url}}"],
+              "path": ["api", "queue", "{{tenant_id}}", "{{service_id}}", "queues"]
+            }
+          }
+        },
+        {
+          "name": "Create Queue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"queueName\": \"orders\",\n    \"queueType\": \"Standard\",\n    \"visibilityTimeoutSeconds\": 30,\n    \"messageRetentionPeriod\": 345600\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/queue/{{tenant_id}}/{{service_id}}/queues",
+              "host": ["{{base_url}}"],
+              "path": ["api", "queue", "{{tenant_id}}", "{{service_id}}", "queues"]
+            }
+          }
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"messageBody\": \"{\\\"orderId\\\": 123, \\\"amount\\\": 99.99, \\\"status\\\": \\\"pending\\\"}\",\n    \"messageAttributes\": {\n        \"priority\": {\n            \"stringValue\": \"high\",\n            \"dataType\": \"String\"\n        }\n    }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/queue/{{tenant_id}}/{{service_id}}/queues/orders/messages",
+              "host": ["{{base_url}}"],
+              "path": ["api", "queue", "{{tenant_id}}", "{{service_id}}", "queues", "orders", "messages"]
+            }
+          }
+        },
+        {
+          "name": "Receive Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/queue/{{tenant_id}}/{{service_id}}/queues/orders/messages?maxNumberOfMessages=5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "queue", "{{tenant_id}}", "{{service_id}}", "queues", "orders", "messages"],
+              "query": [
+                {
+                  "key": "maxNumberOfMessages",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lambda Functions",
+      "item": [
+        {
+          "name": "List Functions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/function/{{tenant_id}}/{{service_id}}/functions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "function", "{{tenant_id}}", "{{service_id}}", "functions"]
+            }
+          }
+        },
+        {
+          "name": "Create Function",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"functionName\": \"order-processor\",\n    \"runtime\": \"dotnet8\",\n    \"role\": \"arn:aws:iam::123456789012:role/lambda-execution-role\",\n    \"handler\": \"OrderProcessor.Handler\",\n    \"code\": \"UEsDBAoAAAAAAKxW1VIAAAAAAAAAAAUAYQAAAG15ZnVuY3Rpb24v\",\n    \"description\": \"Processes order data\",\n    \"timeout\": 30,\n    \"memorySize\": 256\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/function/{{tenant_id}}/{{service_id}}/functions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "function", "{{tenant_id}}", "{{service_id}}", "functions"]
+            }
+          }
+        },
+        {
+          "name": "Invoke Function",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"payload\": {\n        \"orderId\": 123,\n        \"action\": \"process\",\n        \"data\": {\n            \"customer\": \"John Doe\",\n            \"amount\": 99.99\n        }\n    }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/function/{{tenant_id}}/{{service_id}}/functions/order-processor/invoke",
+              "host": ["{{base_url}}"],
+              "path": ["api", "function", "{{tenant_id}}", "{{service_id}}", "functions", "order-processor", "invoke"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Apache Kafka",
+      "item": [
+        {
+          "name": "Get Cluster Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/kafka/{{tenant_id}}/{{service_id}}/cluster/info",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kafka", "{{tenant_id}}", "{{service_id}}", "cluster", "info"]
+            }
+          }
+        },
+        {
+          "name": "List Topics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/kafka/{{tenant_id}}/{{service_id}}/topics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kafka", "{{tenant_id}}", "{{service_id}}", "topics"]
+            }
+          }
+        },
+        {
+          "name": "Create Topic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"user-events\",\n    \"partitions\": 3,\n    \"replicationFactor\": 1,\n    \"retentionMs\": 604800000,\n    \"compressionType\": \"snappy\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kafka/{{tenant_id}}/{{service_id}}/topics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kafka", "{{tenant_id}}", "{{service_id}}", "topics"]
+            }
+          }
+        },
+        {
+          "name": "Produce Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"key\": \"user-456\",\n    \"value\": \"{\\\"userId\\\": 456, \\\"action\\\": \\\"login\\\", \\\"timestamp\\\": \\\"2024-01-15T10:30:00Z\\\"}\",\n    \"headers\": {\n        \"content-type\": \"application/json\",\n        \"source\": \"user-service\"\n    }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kafka/{{tenant_id}}/{{service_id}}/topics/user-events/messages",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kafka", "{{tenant_id}}", "{{service_id}}", "topics", "user-events", "messages"]
+            }
+          }
+        },
+        {
+          "name": "Consume Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/kafka/{{tenant_id}}/{{service_id}}/topics/user-events/messages?consumerGroup=analytics&maxMessages=5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kafka", "{{tenant_id}}", "{{service_id}}", "topics", "user-events", "messages"],
+              "query": [
+                {
+                  "key": "consumerGroup",
+                  "value": "analytics"
+                },
+                {
+                  "key": "maxMessages",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health & Monitoring",
+      "item": [
+        {
+          "name": "API Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Service Instance Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/services/instances/{{service_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "services", "instances", "{{service_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Service Instance Metrics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/services/instances/{{service_id}}/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "services", "instances", "{{service_id}}", "metrics"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -34,11 +34,40 @@ builder.Services.AddScoped<CustomAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(provider =>
     provider.GetRequiredService<CustomAuthenticationStateProvider>());
 
-// Add HTTP client for API communication
-builder.Services.AddHttpClient<ApiClient>(client =>
+// Add HTTP client for API communication with improved configuration
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7000";
+
+// Try to get API service reference from Aspire if available
+if (builder.Environment.IsDevelopment())
 {
-    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7000");
-});
+    try
+    {
+        // This will work if running under Aspire
+        builder.Services.AddHttpClient<ApiClient>("apiservice", client =>
+        {
+            // Default fallback configuration
+            client.BaseAddress = new Uri(apiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+    }
+    catch
+    {
+        // Fallback to direct configuration
+        builder.Services.AddHttpClient<ApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+    }
+}
+else
+{
+    builder.Services.AddHttpClient<ApiClient>(client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+}
 
 // Add local storage
 builder.Services.AddBlazoredLocalStorage(config =>

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Blazored.LocalStorage;
+using Microsoft.JSInterop;
 
 namespace SSBJr.DockSaaS.Web.Services;
 
@@ -10,20 +11,115 @@ public class ApiClient
     private readonly HttpClient _httpClient;
     private readonly ILocalStorageService _localStorage;
     private readonly ILogger<ApiClient> _logger;
+    private readonly IJSRuntime _jsRuntime;
 
-    public ApiClient(HttpClient httpClient, ILocalStorageService localStorage, ILogger<ApiClient> logger)
+    public ApiClient(HttpClient httpClient, ILocalStorageService localStorage, ILogger<ApiClient> logger, IJSRuntime jsRuntime)
     {
         _httpClient = httpClient;
         _localStorage = localStorage;
         _logger = logger;
+        _jsRuntime = jsRuntime;
+    }
+
+    private async Task<bool> IsJavaScriptAvailableAsync()
+    {
+        try
+        {
+            // Check if JavaScript is available (not during prerendering)
+            await _jsRuntime.InvokeVoidAsync("eval", "void(0)");
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            // JavaScript interop is not available during prerendering
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private async Task SetAuthorizationHeaderAsync()
     {
-        var token = await _localStorage.GetItemAsync<string>("authToken");
-        if (!string.IsNullOrEmpty(token))
+        try
         {
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            // Only try to access localStorage if JavaScript is available
+            if (!await IsJavaScriptAvailableAsync())
+            {
+                _logger.LogDebug("JavaScript not available (prerendering), skipping authorization header setup");
+                return;
+            }
+
+            var token = await _localStorage.GetItemAsync<string>("authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                _logger.LogDebug("Authorization header set with token");
+            }
+            else
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = null;
+                _logger.LogDebug("No token found, authorization header cleared");
+            }
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("JavaScript interop"))
+        {
+            _logger.LogDebug("JavaScript interop not available (prerendering), skipping authorization header setup");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to set authorization header");
+            _httpClient.DefaultRequestHeaders.Authorization = null;
+        }
+    }
+
+    /// <summary>
+    /// Checks if the API health endpoint is accessible
+    /// </summary>
+    /// <returns>True if the health endpoint responds successfully, false otherwise</returns>
+    public async Task<bool> CheckHealthAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Checking API health at {BaseAddress}", _httpClient.BaseAddress);
+            
+            var response = await _httpClient.GetAsync("health");
+            
+            _logger.LogInformation("Health check returned status {StatusCode}", response.StatusCode);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                _logger.LogDebug("Health check response: {Content}", content.Length > 100 ? content.Substring(0, 100) + "..." : content);
+                return true;
+            }
+            
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError("Health check failed with status {StatusCode}. Error: {Error}", 
+                response.StatusCode, errorContent);
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error during health check. BaseAddress: {BaseAddress}. Message: {Message}", 
+                _httpClient.BaseAddress, ex.Message);
+            return false;
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            _logger.LogError(ex, "Timeout during health check");
+            return false;
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "Request cancelled during health check");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during health check");
+            return false;
         }
     }
 
@@ -32,23 +128,57 @@ public class ApiClient
         try
         {
             await SetAuthorizationHeaderAsync();
+            _logger.LogInformation("Making GET request to {Endpoint} with base address {BaseAddress}", endpoint, _httpClient.BaseAddress);
+            
             var response = await _httpClient.GetAsync(endpoint);
+            var content = await response.Content.ReadAsStringAsync();
+            
+            _logger.LogInformation("GET request to {Endpoint} returned status {StatusCode}", endpoint, response.StatusCode);
             
             if (response.IsSuccessStatusCode)
             {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions
+                _logger.LogDebug("GET request to {Endpoint} succeeded. Response length: {Length}", endpoint, content.Length);
+                
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    _logger.LogWarning("GET request to {Endpoint} succeeded but returned empty content", endpoint);
+                    return default;
+                }
+                
+                return JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
             }
             
-            _logger.LogWarning("GET request to {Endpoint} failed with status {StatusCode}", endpoint, response.StatusCode);
+            _logger.LogError("GET request to {Endpoint} failed with status {StatusCode}. Error: {Error}", 
+                endpoint, response.StatusCode, content);
+            return default;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error making GET request to {Endpoint}. BaseAddress: {BaseAddress}. Message: {Message}", 
+                endpoint, _httpClient.BaseAddress, ex.Message);
+            return default;
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            _logger.LogError(ex, "Timeout making GET request to {Endpoint}", endpoint);
+            return default;
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "Request cancelled making GET request to {Endpoint}", endpoint);
+            return default;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "JSON deserialization error for GET request to {Endpoint}", endpoint);
             return default;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error making GET request to {Endpoint}", endpoint);
+            _logger.LogError(ex, "Unexpected error making GET request to {Endpoint}", endpoint);
             return default;
         }
     }
@@ -61,23 +191,58 @@ public class ApiClient
             var json = JsonSerializer.Serialize(request);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             
+            _logger.LogInformation("Making POST request to {Endpoint} with base address {BaseAddress}", endpoint, _httpClient.BaseAddress);
+            _logger.LogDebug("POST request payload: {Payload}", json.Length > 500 ? json.Substring(0, 500) + "..." : json);
+            
             var response = await _httpClient.PostAsync(endpoint, content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            _logger.LogInformation("POST request to {Endpoint} returned status {StatusCode}", endpoint, response.StatusCode);
             
             if (response.IsSuccessStatusCode)
             {
-                var responseJson = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<TResponse>(responseJson, new JsonSerializerOptions
+                _logger.LogDebug("POST request to {Endpoint} succeeded. Response length: {Length}", endpoint, responseContent.Length);
+                
+                if (string.IsNullOrWhiteSpace(responseContent))
+                {
+                    _logger.LogWarning("POST request to {Endpoint} succeeded but returned empty content", endpoint);
+                    return default;
+                }
+                
+                return JsonSerializer.Deserialize<TResponse>(responseContent, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
             }
             
-            _logger.LogWarning("POST request to {Endpoint} failed with status {StatusCode}", endpoint, response.StatusCode);
+            _logger.LogError("POST request to {Endpoint} failed with status {StatusCode}. Error: {Error}", 
+                endpoint, response.StatusCode, responseContent);
+            return default;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error making POST request to {Endpoint}. BaseAddress: {BaseAddress}. Message: {Message}", 
+                endpoint, _httpClient.BaseAddress, ex.Message);
+            return default;
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            _logger.LogError(ex, "Timeout making POST request to {Endpoint}", endpoint);
+            return default;
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "Request cancelled making POST request to {Endpoint}", endpoint);
+            return default;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "JSON serialization/deserialization error for POST request to {Endpoint}", endpoint);
             return default;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error making POST request to {Endpoint}", endpoint);
+            _logger.LogError(ex, "Unexpected error making POST request to {Endpoint}", endpoint);
             return default;
         }
     }
@@ -90,7 +255,19 @@ public class ApiClient
             var json = JsonSerializer.Serialize(request);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             
+            _logger.LogInformation("Making POST request to {Endpoint}", endpoint);
+            
             var response = await _httpClient.PostAsync(endpoint, content);
+            
+            _logger.LogInformation("POST request to {Endpoint} returned status {StatusCode}", endpoint, response.StatusCode);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("POST request to {Endpoint} failed with status {StatusCode}. Error: {Error}", 
+                    endpoint, response.StatusCode, errorContent);
+            }
+            
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -105,7 +282,20 @@ public class ApiClient
         try
         {
             await SetAuthorizationHeaderAsync();
+            
+            _logger.LogInformation("Making POST request to {Endpoint}", endpoint);
+            
             var response = await _httpClient.PostAsync(endpoint, null);
+            
+            _logger.LogInformation("POST request to {Endpoint} returned status {StatusCode}", endpoint, response.StatusCode);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("POST request to {Endpoint} failed with status {StatusCode}. Error: {Error}", 
+                    endpoint, response.StatusCode, errorContent);
+            }
+            
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -134,6 +324,9 @@ public class ApiClient
                 });
             }
             
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError("PUT request to {Endpoint} failed with status {StatusCode}. Error: {Error}", 
+                endpoint, response.StatusCode, errorContent);
             return default;
         }
         catch (Exception ex)
@@ -149,12 +342,35 @@ public class ApiClient
         {
             await SetAuthorizationHeaderAsync();
             var response = await _httpClient.DeleteAsync(endpoint);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("DELETE request to {Endpoint} failed with status {StatusCode}. Error: {Error}", 
+                    endpoint, response.StatusCode, errorContent);
+            }
+            
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error making DELETE request to {Endpoint}", endpoint);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Manually sets the authorization token for scenarios where localStorage is not available
+    /// </summary>
+    public void SetAuthorizationToken(string? token)
+    {
+        if (!string.IsNullOrEmpty(token))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        else
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = null;
         }
     }
 }

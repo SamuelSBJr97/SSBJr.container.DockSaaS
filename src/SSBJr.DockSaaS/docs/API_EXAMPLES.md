@@ -1,6 +1,6 @@
 # DockSaaS API Examples
 
-This document provides examples of how to consume the DockSaaS APIs for each service type.
+This document provides comprehensive examples of how to consume the DockSaaS APIs for each service type.
 
 ## Authentication
 
@@ -19,77 +19,139 @@ Authorization: Bearer YOUR_JWT_TOKEN
 
 Each service instance gets its own endpoint in the format:
 ```
-{BASE_URL}/{service_type}/{tenant_id}/{service_instance_id}
+{BASE_URL}/api/{service_type}/{tenant_id}/{service_instance_id}
 ```
 
-## S3-like Storage Service
+---
 
-### Upload File
+## ??? S3-like Storage Service
+
+### List Buckets
 ```bash
-curl -X POST "https://localhost:7000/s3storage/{tenant-id}/{service-id}/upload" \
+curl -X GET "https://localhost:7000/api/s3storage/{tenant-id}/{service-id}/buckets" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Create Bucket
+```bash
+curl -X POST "https://localhost:7000/api/s3storage/{tenant-id}/{service-id}/buckets" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-documents",
+    "versioning": true,
+    "encryption": true,
+    "publicAccess": false
+  }'
+```
+
+### Get Bucket Details
+```bash
+curl -X GET "https://localhost:7000/api/s3storage/{tenant-id}/{service-id}/buckets/my-documents" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### List Objects in Bucket
+```bash
+curl -X GET "https://localhost:7000/api/s3storage/{tenant-id}/{service-id}/buckets/my-documents/objects?prefix=documents/&maxKeys=100" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Upload Object
+```bash
+curl -X POST "https://localhost:7000/api/s3storage/{tenant-id}/{service-id}/buckets/my-documents/objects" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -F "file=@document.pdf" \
-  -F "key=documents/important.pdf"
+  -F "key=documents/important.pdf" \
+  -F "contentType=application/pdf"
 ```
 
-### Download File
+### Download Object
 ```bash
-curl -X GET "https://localhost:7000/s3storage/{tenant-id}/{service-id}/download/documents/important.pdf" \
+curl -X GET "https://localhost:7000/api/s3storage/{tenant-id}/{service-id}/buckets/my-documents/objects/documents/important.pdf" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -o downloaded_file.pdf
 ```
 
-### List Objects
-```bash
-curl -X GET "https://localhost:7000/s3storage/{tenant-id}/{service-id}/objects" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}"
-```
-
 ### Delete Object
 ```bash
-curl -X DELETE "https://localhost:7000/s3storage/{tenant-id}/{service-id}/objects/documents/important.pdf" \
+curl -X DELETE "https://localhost:7000/api/s3storage/{tenant-id}/{service-id}/buckets/my-documents/objects/documents/important.pdf" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}"
 ```
 
-## RDS-like Database Service
-
-### Execute Query
+### Get Storage Usage
 ```bash
-curl -X POST "https://localhost:7000/rdsdatabase/{tenant-id}/{service-id}/query" \
+curl -X GET "https://localhost:7000/api/s3storage/{tenant-id}/{service-id}/usage" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+---
+
+## ??? RDS-like Database Service
+
+### Get Database Instance Info
+```bash
+curl -X GET "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/info" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Execute SQL Query
+```bash
+curl -X POST "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/query" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "SELECT * FROM users WHERE active = ?",
-    "parameters": [true]
+    "query": "SELECT * FROM users WHERE active = ? LIMIT ?",
+    "parameters": [true, 10]
   }'
+```
+
+### List Tables
+```bash
+curl -X GET "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/tables" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
 ```
 
 ### Create Table
 ```bash
-curl -X POST "https://localhost:7000/rdsdatabase/{tenant-id}/{service-id}/tables" \
+curl -X POST "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/tables" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
     "tableName": "users",
+    "schemaName": "public",
     "schema": {
-      "id": "int primary key auto_increment",
-      "name": "varchar(255) not null",
-      "email": "varchar(255) unique not null",
-      "active": "boolean default true",
-      "created_at": "timestamp default current_timestamp"
+      "id": "SERIAL PRIMARY KEY",
+      "name": "VARCHAR(255) NOT NULL",
+      "email": "VARCHAR(255) UNIQUE NOT NULL",
+      "active": "BOOLEAN DEFAULT true",
+      "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     }
   }'
 ```
 
-### Insert Data
+### Get Table Details
 ```bash
-curl -X POST "https://localhost:7000/rdsdatabase/{tenant-id}/{service-id}/tables/users/rows" \
+curl -X GET "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/tables/users" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Insert Row
+```bash
+curl -X POST "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/tables/users/rows" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
@@ -100,16 +162,83 @@ curl -X POST "https://localhost:7000/rdsdatabase/{tenant-id}/{service-id}/tables
   }'
 ```
 
-## DynamoDB-like NoSQL Service
-
-### Put Item
+### List Backups
 ```bash
-curl -X POST "https://localhost:7000/nosqldatabase/{tenant-id}/{service-id}/items" \
+curl -X GET "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/backups" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Create Backup
+```bash
+curl -X POST "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/backups" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "retentionDays": 30
+  }'
+```
+
+### Get Database Metrics
+```bash
+curl -X GET "https://localhost:7000/api/rdsdatabase/{tenant-id}/{service-id}/metrics" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+---
+
+## ?? DynamoDB-like NoSQL Service
+
+### List Tables
+```bash
+curl -X GET "https://localhost:7000/api/nosqldatabase/{tenant-id}/{service-id}/tables" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Create Table
+```bash
+curl -X POST "https://localhost:7000/api/nosqldatabase/{tenant-id}/{service-id}/tables" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
     "tableName": "users",
+    "keySchema": [
+      {
+        "attributeName": "id",
+        "keyType": "HASH"
+      }
+    ],
+    "attributeDefinitions": [
+      {
+        "attributeName": "id",
+        "attributeType": "S"
+      }
+    ],
+    "provisionedThroughput": {
+      "readCapacityUnits": 5,
+      "writeCapacityUnits": 5
+    }
+  }'
+```
+
+### Get Table Details
+```bash
+curl -X GET "https://localhost:7000/api/nosqldatabase/{tenant-id}/{service-id}/tables/users" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Put Item
+```bash
+curl -X POST "https://localhost:7000/api/nosqldatabase/{tenant-id}/{service-id}/tables/users/items" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
     "item": {
       "id": {"S": "user123"},
       "name": {"S": "John Doe"},
@@ -122,136 +251,349 @@ curl -X POST "https://localhost:7000/nosqldatabase/{tenant-id}/{service-id}/item
 
 ### Get Item
 ```bash
-curl -X GET "https://localhost:7000/nosqldatabase/{tenant-id}/{service-id}/items/users/user123" \
+curl -X GET "https://localhost:7000/api/nosqldatabase/{tenant-id}/{service-id}/tables/users/items/user123" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}"
 ```
 
 ### Query Items
 ```bash
-curl -X POST "https://localhost:7000/nosqldatabase/{tenant-id}/{service-id}/query" \
+curl -X POST "https://localhost:7000/api/nosqldatabase/{tenant-id}/{service-id}/tables/users/query" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
-    "tableName": "users",
     "keyConditions": {
       "id": {
         "attributeValueList": [{"S": "user123"}],
         "comparisonOperator": "EQ"
       }
-    }
+    },
+    "limit": 10
   }'
 ```
 
-## SQS-like Queue Service
-
-### Send Message
+### Scan Table
 ```bash
-curl -X POST "https://localhost:7000/queue/{tenant-id}/{service-id}/messages" \
+curl -X POST "https://localhost:7000/api/nosqldatabase/{tenant-id}/{service-id}/tables/users/scan" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
-    "messageBody": "Hello World!",
-    "attributes": {
-      "priority": "high",
-      "source": "api"
-    },
+    "limit": 20,
+    "filterExpression": "attribute_exists(active)"
+  }'
+```
+
+### Delete Item
+```bash
+curl -X DELETE "https://localhost:7000/api/nosqldatabase/{tenant-id}/{service-id}/tables/users/items/user123" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+---
+
+## ?? SQS-like Queue Service
+
+### List Queues
+```bash
+curl -X GET "https://localhost:7000/api/queue/{tenant-id}/{service-id}/queues" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Create Queue
+```bash
+curl -X POST "https://localhost:7000/api/queue/{tenant-id}/{service-id}/queues" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "queueName": "processing-queue",
+    "queueType": "Standard",
+    "visibilityTimeoutSeconds": 30,
+    "messageRetentionPeriod": 345600,
+    "maxReceiveCount": 10,
     "delaySeconds": 0
+  }'
+```
+
+### Get Queue Details
+```bash
+curl -X GET "https://localhost:7000/api/queue/{tenant-id}/{service-id}/queues/processing-queue" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Send Message
+```bash
+curl -X POST "https://localhost:7000/api/queue/{tenant-id}/{service-id}/queues/processing-queue/messages" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messageBody": "Hello World! This is a test message.",
+    "delaySeconds": 0,
+    "messageAttributes": {
+      "priority": {
+        "stringValue": "high",
+        "dataType": "String"
+      },
+      "source": {
+        "stringValue": "api",
+        "dataType": "String"
+      }
+    }
   }'
 ```
 
 ### Receive Messages
 ```bash
-curl -X GET "https://localhost:7000/queue/{tenant-id}/{service-id}/messages?maxMessages=10&waitTimeSeconds=20" \
+curl -X GET "https://localhost:7000/api/queue/{tenant-id}/{service-id}/queues/processing-queue/messages?maxNumberOfMessages=10&visibilityTimeoutSeconds=30&waitTimeSeconds=20" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}"
 ```
 
 ### Delete Message
 ```bash
-curl -X DELETE "https://localhost:7000/queue/{tenant-id}/{service-id}/messages/{receipt-handle}" \
+curl -X DELETE "https://localhost:7000/api/queue/{tenant-id}/{service-id}/queues/processing-queue/messages/{receipt-handle}" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}"
+```
+
+### Send Message Batch
+```bash
+curl -X POST "https://localhost:7000/api/queue/{tenant-id}/{service-id}/queues/processing-queue/messages/batch" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entries": [
+      {
+        "id": "msg1",
+        "messageBody": "First message",
+        "delaySeconds": 0
+      },
+      {
+        "id": "msg2",
+        "messageBody": "Second message",
+        "delaySeconds": 5
+      }
+    ]
+  }'
 ```
 
 ### Get Queue Attributes
 ```bash
-curl -X GET "https://localhost:7000/queue/{tenant-id}/{service-id}/attributes" \
+curl -X GET "https://localhost:7000/api/queue/{tenant-id}/{service-id}/queues/processing-queue/attributes" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}"
 ```
 
-## Lambda-like Functions Service
+---
 
-### Invoke Function
+## ? Lambda-like Functions Service
+
+### List Functions
 ```bash
-curl -X POST "https://localhost:7000/function/{tenant-id}/{service-id}/invoke" \
+curl -X GET "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Create Function
+```bash
+curl -X POST "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "functionName": "user-processor",
+    "runtime": "dotnet8",
+    "role": "arn:aws:iam::123456789012:role/lambda-execution-role",
+    "handler": "MyFunction.Handler",
+    "code": "UEsDBAoAAAAAAKxW...", 
+    "description": "Processes user data",
+    "timeout": 30,
+    "memorySize": 128,
+    "environment": {
+      "variables": {
+        "LOG_LEVEL": "INFO",
+        "DATABASE_URL": "postgresql://..."
+      }
+    }
+  }'
+```
+
+### Get Function Details
+```bash
+curl -X GET "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions/user-processor" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Update Function
+```bash
+curl -X PUT "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions/user-processor" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Updated function description",
+    "timeout": 60,
+    "memorySize": 256,
+    "environment": {
+      "variables": {
+        "LOG_LEVEL": "DEBUG"
+      }
+    }
+  }'
+```
+
+### Invoke Function (Synchronous)
+```bash
+curl -X POST "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions/user-processor/invoke?invocationType=RequestResponse" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
     "payload": {
-      "name": "John",
-      "operation": "greet"
+      "userId": 123,
+      "action": "process",
+      "data": {
+        "name": "John Doe",
+        "email": "john@example.com"
+      }
+    }
+  }'
+```
+
+### Invoke Function (Asynchronous)
+```bash
+curl -X POST "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions/user-processor/invoke?invocationType=Event" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payload": {
+      "userId": 456,
+      "action": "process_async"
     }
   }'
 ```
 
 ### Update Function Code
 ```bash
-curl -X PUT "https://localhost:7000/function/{tenant-id}/{service-id}/code" \
+curl -X PUT "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions/user-processor/code" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
-    "runtime": "dotnet8",
-    "handler": "MyFunction.Handler",
-    "code": "base64-encoded-zip-file"
+    "zipFile": "UEsDBAoAAAAAAKxW1VIAAAAAAAAAAAUAYQAAAG15ZnVuY3Rpb24vUEsDBBQAAAAIAKxW1VI..."
   }'
 ```
 
 ### Get Function Configuration
 ```bash
-curl -X GET "https://localhost:7000/function/{tenant-id}/{service-id}/configuration" \
+curl -X GET "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions/user-processor/configuration" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}"
 ```
 
-## CloudWatch-like Monitoring Service
-
-### Put Metric Data
+### Get Function Invocation Metrics
 ```bash
-curl -X POST "https://localhost:7000/monitoring/{tenant-id}/{service-id}/metrics" \
+curl -X GET "https://localhost:7000/api/function/{tenant-id}/{service-id}/functions/user-processor/invocations?startTime=2024-01-01T00:00:00Z&endTime=2024-01-02T00:00:00Z" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+---
+
+## ?? Apache Kafka Service
+
+### Get Cluster Information
+```bash
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/cluster/info" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Get Cluster Health
+```bash
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/cluster/health" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### List Topics
+```bash
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Create Topic
+```bash
+curl -X POST "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
-    "namespace": "MyApp/Performance",
-    "metricData": [
-      {
-        "metricName": "ResponseTime",
-        "value": 150.5,
-        "unit": "Milliseconds",
-        "timestamp": "2024-01-15T10:30:00Z",
-        "dimensions": [
-          {
-            "name": "Environment",
-            "value": "Production"
-          }
-        ]
-      }
-    ]
+    "name": "user-events",
+    "partitions": 6,
+    "replicationFactor": 1,
+    "retentionMs": 604800000,
+    "compressionType": "snappy",
+    "cleanupPolicy": "delete"
   }'
 ```
 
-### Get Metric Statistics
+### Get Topic Details
 ```bash
-curl -X GET "https://localhost:7000/monitoring/{tenant-id}/{service-id}/metrics/statistics?metricName=ResponseTime&startTime=2024-01-15T00:00:00Z&endTime=2024-01-15T23:59:59Z&period=300&statistics=Average,Maximum" \
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events" \
   -H "Authorization: Bearer {your-jwt-token}" \
   -H "X-API-Key: {service-api-key}"
 ```
+
+### Produce Message
+```bash
+curl -X POST "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events/messages" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "user-123",
+    "value": "{\"userId\": 123, \"action\": \"login\", \"timestamp\": \"2024-01-15T10:30:00Z\"}",
+    "headers": {
+      "content-type": "application/json",
+      "source": "user-service"
+    }
+  }'
+```
+
+### Consume Messages
+```bash
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events/messages?consumerGroup=analytics&maxMessages=5&timeoutMs=10000" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### List Consumer Groups
+```bash
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/consumer-groups" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+### Delete Topic
+```bash
+curl -X DELETE "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events" \
+  -H "Authorization: Bearer {your-jwt-token}" \
+  -H "X-API-Key: {service-api-key}"
+```
+
+---
 
 ## Error Handling
 
@@ -279,6 +621,8 @@ Common HTTP status codes:
 - `500` - Internal Server Error
 - `503` - Service Unavailable
 
+---
+
 ## Rate Limiting
 
 All APIs are subject to rate limiting based on your tenant's plan:
@@ -295,6 +639,8 @@ X-RateLimit-Remaining: 999
 X-RateLimit-Reset: 1642771200
 ```
 
+---
+
 ## SDK Examples
 
 ### JavaScript/Node.js
@@ -307,14 +653,56 @@ const client = new DockSaaSClient({
   token: 'your-jwt-token'
 });
 
-// Upload file to S3-like storage
-const result = await client.storage.upload({
+// S3 Storage - Upload file
+const s3Result = await client.s3.uploadObject({
   serviceId: 'service-id',
-  file: fs.createReadStream('document.pdf'),
-  key: 'documents/important.pdf'
+  bucketName: 'documents',
+  key: 'important.pdf',
+  file: fs.createReadStream('document.pdf')
 });
 
-console.log('Upload result:', result);
+// RDS Database - Execute query
+const rdsResult = await client.rds.executeQuery({
+  serviceId: 'rds-service-id',
+  query: 'SELECT * FROM users WHERE active = ?',
+  parameters: [true]
+});
+
+// NoSQL Database - Put item
+const nosqlResult = await client.nosql.putItem({
+  serviceId: 'nosql-service-id',
+  tableName: 'users',
+  item: {
+    id: { S: 'user123' },
+    name: { S: 'John Doe' },
+    email: { S: 'john@example.com' }
+  }
+});
+
+// Queue - Send message
+const queueResult = await client.queue.sendMessage({
+  serviceId: 'queue-service-id',
+  queueName: 'processing-queue',
+  messageBody: 'Hello World!',
+  messageAttributes: {
+    priority: { stringValue: 'high', dataType: 'String' }
+  }
+});
+
+// Lambda - Invoke function
+const lambdaResult = await client.lambda.invoke({
+  serviceId: 'lambda-service-id',
+  functionName: 'user-processor',
+  payload: { userId: 123, action: 'process' }
+});
+
+// Kafka - Produce message
+const kafkaResult = await client.kafka.produce({
+  serviceId: 'kafka-service-id',
+  topic: 'user-events',
+  key: 'user-123',
+  value: JSON.stringify({ userId: 123, action: 'login' })
+});
 ```
 
 ### Python
@@ -327,14 +715,55 @@ client = DockSaaSClient(
     token='your-jwt-token'
 )
 
-# Send message to queue
-result = client.queue.send_message(
-    service_id='service-id',
-    message_body='Hello World!',
-    attributes={'priority': 'high'}
+# S3 Storage - List buckets
+buckets = client.s3.list_buckets(service_id='service-id')
+
+# RDS Database - Create table
+table = client.rds.create_table(
+    service_id='rds-service-id',
+    table_name='users',
+    schema={
+        'id': 'SERIAL PRIMARY KEY',
+        'name': 'VARCHAR(255) NOT NULL',
+        'email': 'VARCHAR(255) UNIQUE NOT NULL'
+    }
 )
 
-print(f"Message sent: {result}")
+# NoSQL Database - Query items
+items = client.nosql.query(
+    service_id='nosql-service-id',
+    table_name='users',
+    key_conditions={
+        'id': {
+            'attribute_value_list': [{'S': 'user123'}],
+            'comparison_operator': 'EQ'
+        }
+    }
+)
+
+# Queue - Receive messages
+messages = client.queue.receive_messages(
+    service_id='queue-service-id',
+    queue_name='processing-queue',
+    max_number_of_messages=10
+)
+
+# Lambda - Create function
+function = client.lambda_func.create_function(
+    service_id='lambda-service-id',
+    function_name='data-processor',
+    runtime='python3.9',
+    handler='lambda_function.lambda_handler',
+    code=base64.b64encode(zip_content).decode('utf-8')
+)
+
+# Kafka - Consume messages
+kafka_messages = client.kafka.consume(
+    service_id='kafka-service-id',
+    topic='events',
+    consumer_group='analytics',
+    max_messages=5
+)
 ```
 
 ### C#
@@ -348,23 +777,73 @@ var client = new DockSaaSClient(new DockSaaSClientOptions
     Token = "your-jwt-token"
 });
 
-// Query NoSQL database
-var result = await client.NoSQL.QueryAsync(new QueryRequest
+// S3 Storage - Upload object
+var s3Response = await client.S3.UploadObjectAsync(new UploadObjectRequest
 {
     ServiceId = "service-id",
+    BucketName = "documents",
+    Key = "important.pdf",
+    Content = fileStream,
+    ContentType = "application/pdf"
+});
+
+// RDS Database - Insert row
+var rdsResponse = await client.RDS.InsertRowAsync(new InsertRowRequest
+{
+    ServiceId = "rds-service-id",
     TableName = "users",
-    KeyConditions = new Dictionary<string, Condition>
+    Data = new Dictionary<string, object>
     {
-        ["id"] = new Condition
-        {
-            AttributeValueList = new[] { new AttributeValue { S = "user123" } },
-            ComparisonOperator = "EQ"
-        }
+        ["name"] = "John Doe",
+        ["email"] = "john@example.com",
+        ["active"] = true
     }
 });
 
-Console.WriteLine($"Query result: {result}");
+// NoSQL Database - Scan table
+var nosqlResponse = await client.NoSQL.ScanAsync(new ScanRequest
+{
+    ServiceId = "nosql-service-id",
+    TableName = "users",
+    Limit = 20
+});
+
+// Queue - Send message batch
+var queueResponse = await client.Queue.SendMessageBatchAsync(new SendMessageBatchRequest
+{
+    ServiceId = "queue-service-id",
+    QueueName = "processing-queue",
+    Entries = new[]
+    {
+        new MessageEntry { Id = "1", MessageBody = "First message" },
+        new MessageEntry { Id = "2", MessageBody = "Second message" }
+    }
+});
+
+// Lambda - Invoke function
+var lambdaResponse = await client.Lambda.InvokeAsync(new InvokeRequest
+{
+    ServiceId = "lambda-service-id",
+    FunctionName = "user-processor",
+    Payload = JsonSerializer.Serialize(new { UserId = 123, Action = "process" })
+});
+
+// Kafka - Produce message
+var kafkaResponse = await client.Kafka.ProduceAsync(new ProduceRequest
+{
+    ServiceId = "kafka-service-id",
+    Topic = "user-events",
+    Key = "user-456",
+    Value = JsonSerializer.Serialize(new { UserId = 456, Action = "purchase" }),
+    Headers = new Dictionary<string, string>
+    {
+        ["content-type"] = "application/json",
+        ["source"] = "order-service"
+    }
+});
 ```
+
+---
 
 ## Webhooks
 
@@ -400,5 +879,51 @@ function verifyWebhookSignature(payload, signature, secret) {
   return signature === `sha256=${expectedSignature}`;
 }
 ```
+
+---
+
+## Service-Specific Features
+
+### S3 Storage Features
+- Multi-part uploads for large files
+- Object versioning and lifecycle policies
+- Server-side encryption
+- Pre-signed URLs for temporary access
+- Cross-origin resource sharing (CORS)
+
+### RDS Database Features
+- Automated backups with point-in-time recovery
+- Read replicas for scaling
+- Performance insights and monitoring
+- SSL/TLS encryption in transit
+- Parameter groups for configuration
+
+### NoSQL Database Features
+- Global secondary indexes
+- Local secondary indexes
+- Time to live (TTL) for automatic deletion
+- Point-in-time recovery
+- Conditional operations
+
+### Queue Features
+- Message deduplication for FIFO queues
+- Dead letter queues for failed messages
+- Message attributes and filtering
+- Long polling for efficient message retrieval
+- Batch operations for throughput
+
+### Lambda Features
+- Environment variables and secrets
+- VPC support for network isolation
+- Layers for code sharing
+- Versioning and aliases
+- Event source mappings
+
+### Kafka Features
+- Schema Registry for data governance
+- Kafka Connect for data integration
+- Consumer group management
+- Topic partitioning strategies
+- Message compression and retention
 
 For more detailed API documentation, visit the Swagger UI at `/swagger` when running the application.

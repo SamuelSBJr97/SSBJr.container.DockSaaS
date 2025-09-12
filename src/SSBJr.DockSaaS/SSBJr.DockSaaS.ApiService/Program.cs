@@ -8,9 +8,6 @@ using SSBJr.DockSaaS.ApiService.Data;
 using SSBJr.DockSaaS.ApiService.Models;
 using SSBJr.DockSaaS.ApiService.Services;
 using System.Text;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using HealthChecks.UI.Client;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -99,17 +96,14 @@ builder.Services.AddScoped<IServiceProvisioningService, ServiceProvisioningServi
 builder.Services.AddScoped<SSBJr.DockSaaS.ApiService.Services.IServiceProvider, S3StorageServiceProvider>();
 builder.Services.AddScoped<SSBJr.DockSaaS.ApiService.Services.IServiceProvider, RDSDatabaseServiceProvider>();
 builder.Services.AddScoped<SSBJr.DockSaaS.ApiService.Services.IServiceProvider, NoSQLDatabaseServiceProvider>();
+builder.Services.AddScoped<SSBJr.DockSaaS.ApiService.Services.IServiceProvider, QueueServiceProvider>();
+builder.Services.AddScoped<SSBJr.DockSaaS.ApiService.Services.IServiceProvider, KafkaServiceProvider>();
 builder.Services.AddScoped<IServiceInstanceProviders, ServiceInstanceProviders>();
 
 // Configure background services for metrics collection and data generation
 builder.Services.AddHostedService<MetricsCollectionService>();
 builder.Services.AddHostedService<BillingProcessingService>();
 builder.Services.AddHostedService<NotificationService>();
-
-// Add health checks
-builder.Services.AddHealthChecks()
-    .AddCheck("api_service", () => HealthCheckResult.Healthy("API service is running"))
-    .AddDbContextCheck<DockSaaSDbContext>("database");
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -118,15 +112,23 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy.WithOrigins(
-                    "https://localhost:7001", 
-                    "http://localhost:5201",
-                    "https://localhost:7088", // Fallback port from launchSettings
-                    "http://localhost:5288"   // Fallback port from launchSettings
+                    "https://localhost:7001",   // Web HTTPS (primary)
+                    "http://localhost:5201",    // Web HTTP (primary)
+                    "https://localhost:7000",   // API HTTPS (for swagger)
+                    "http://localhost:5200"     // API HTTP (for swagger)
                   )
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials()
-                  .SetIsOriginAllowed((host) => true); // Allow any origin in development
+                  .SetIsOriginAllowed((host) => 
+                  {
+                      // Allow any localhost origin in development
+                      if (builder.Environment.IsDevelopment())
+                      {
+                          return host.Contains("localhost") || host.Contains("127.0.0.1");
+                      }
+                      return false;
+                  });
         });
 });
 
@@ -217,12 +219,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-// Add health checks
-app.MapHealthChecks("/health", new HealthCheckOptions
-{
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-});
 
 // Ensure database is created and seeded
 await using (var scope = app.Services.CreateAsyncScope())
@@ -497,6 +493,42 @@ static async Task SeedServiceDefinitionsAsync(DockSaaSDbContext context)
                     "runtime": "dotnet8",
                     "timeout": 30,
                     "memory": 128
+                }
+                """,
+                IsActive = true
+            },
+            new ServiceDefinition
+            {
+                Id = Guid.NewGuid(),
+                Name = "Apache Kafka",
+                Type = "Kafka",
+                Description = "Distributed streaming platform for building real-time data pipelines and streaming applications",
+                ConfigurationSchema = """
+                {
+                    "partitions": { "type": "integer", "default": 3, "minimum": 1, "maximum": 100 },
+                    "replicationFactor": { "type": "integer", "default": 1, "minimum": 1, "maximum": 3 },
+                    "retentionHours": { "type": "integer", "default": 168, "minimum": 1, "maximum": 8760 },
+                    "compressionType": { "type": "string", "enum": ["none", "gzip", "snappy", "lz4", "zstd"], "default": "snappy" },
+                    "cleanupPolicy": { "type": "string", "enum": ["delete", "compact"], "default": "delete" },
+                    "maxMessageBytes": { "type": "integer", "default": 1048576, "minimum": 1024, "maximum": 104857600 },
+                    "securityProtocol": { "type": "string", "enum": ["PLAINTEXT", "SASL_PLAINTEXT", "SASL_SSL", "SSL"], "default": "SASL_SSL" },
+                    "saslMechanism": { "type": "string", "enum": ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"], "default": "PLAIN" },
+                    "enableSchemaRegistry": { "type": "boolean", "default": true },
+                    "enableKafkaConnect": { "type": "boolean", "default": false }
+                }
+                """,
+                DefaultConfiguration = """
+                {
+                    "partitions": 3,
+                    "replicationFactor": 1,
+                    "retentionHours": 168,
+                    "compressionType": "snappy",
+                    "cleanupPolicy": "delete",
+                    "maxMessageBytes": 1048576,
+                    "securityProtocol": "SASL_SSL",
+                    "saslMechanism": "PLAIN",
+                    "enableSchemaRegistry": true,
+                    "enableKafkaConnect": false
                 }
                 """,
                 IsActive = true

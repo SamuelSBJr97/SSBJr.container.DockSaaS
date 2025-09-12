@@ -43,6 +43,156 @@ public class ServiceInstanceProviders : IServiceInstanceProviders
     }
 }
 
+// Apache Kafka Service Provider
+public class KafkaServiceProvider : IServiceProvider
+{
+    public string ServiceType => "Kafka";
+    private readonly ILogger<KafkaServiceProvider> _logger;
+    private readonly IConfiguration _configuration;
+
+    public KafkaServiceProvider(ILogger<KafkaServiceProvider> logger, IConfiguration configuration)
+    {
+        _logger = logger;
+        _configuration = configuration;
+    }
+
+    public async Task<ServiceProvisioningResult> ProvisionAsync(ServiceInstance serviceInstance)
+    {
+        _logger.LogInformation("Provisioning Kafka cluster for service {ServiceId}", serviceInstance.Id);
+
+        // Create isolated Kafka cluster for this tenant
+        var clusterName = $"tenant-{serviceInstance.TenantId}-kafka-{serviceInstance.Id}";
+        var apiKey = GenerateApiKey();
+        var endpointUrl = $"{_configuration["ServiceEndpoints:BaseUrl"]}/kafka/{serviceInstance.TenantId}/{serviceInstance.Id}";
+
+        // Simulate Kafka cluster creation
+        await CreateKafkaClusterAsync(clusterName, serviceInstance);
+
+        return new ServiceProvisioningResult
+        {
+            Success = true,
+            EndpointUrl = endpointUrl,
+            ApiKey = apiKey,
+            Metadata = new Dictionary<string, object>
+            {
+                { "clusterName", clusterName },
+                { "bootstrapServers", $"{endpointUrl}:9092" },
+                { "schemaRegistry", $"{endpointUrl}:8081" },
+                { "kafkaConnect", $"{endpointUrl}:8083" },
+                { "partitions", 3 },
+                { "replicationFactor", 1 },
+                { "retentionHours", 168 }, // 7 days
+                { "compressionType", "snappy" },
+                { "securityProtocol", "SASL_SSL" },
+                { "saslMechanism", "PLAIN" }
+            }
+        };
+    }
+
+    public async Task<ServiceProvisioningResult> DeprovisionAsync(ServiceInstance serviceInstance)
+    {
+        _logger.LogInformation("Deprovisioning Kafka cluster for service {ServiceId}", serviceInstance.Id);
+
+        var clusterName = $"tenant-{serviceInstance.TenantId}-kafka-{serviceInstance.Id}";
+        await DeleteKafkaClusterAsync(clusterName);
+
+        return new ServiceProvisioningResult { Success = true };
+    }
+
+    public async Task<ServiceProvisioningResult> StartAsync(ServiceInstance serviceInstance)
+    {
+        _logger.LogInformation("Starting Kafka cluster for service {ServiceId}", serviceInstance.Id);
+        // Simulate cluster startup
+        await Task.Delay(300);
+        return new ServiceProvisioningResult { Success = true };
+    }
+
+    public async Task<ServiceProvisioningResult> StopAsync(ServiceInstance serviceInstance)
+    {
+        _logger.LogInformation("Stopping Kafka cluster for service {ServiceId}", serviceInstance.Id);
+        // Simulate cluster shutdown
+        await Task.Delay(200);
+        return new ServiceProvisioningResult { Success = true };
+    }
+
+    public async Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
+    {
+        var random = new Random();
+        return new ServiceStatus
+        {
+            Status = serviceInstance.Status,
+            LastChecked = DateTime.UtcNow,
+            Details = new Dictionary<string, object>
+            {
+                { "brokers", random.Next(1, 5) },
+                { "topics", random.Next(5, 50) },
+                { "totalPartitions", random.Next(15, 150) },
+                { "activeConsumerGroups", random.Next(2, 20) },
+                { "messagesPerSecond", random.Next(100, 10000) },
+                { "diskUsagePercent", Math.Round(random.NextDouble() * 80, 2) },
+                { "networkThroughputMbps", Math.Round(random.NextDouble() * 1000, 2) }
+            }
+        };
+    }
+
+    public async Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
+    {
+        var random = new Random();
+        return new ServiceMetrics
+        {
+            ServiceInstanceId = serviceInstance.Id,
+            Timestamp = DateTime.UtcNow,
+            Metrics = new Dictionary<string, double>
+            {
+                ["messages_produced"] = random.Next(1000, 50000),
+                ["messages_consumed"] = random.Next(800, 45000),
+                ["bytes_in_per_sec"] = random.Next(1024, 1024 * 1024 * 10), // 1KB to 10MB
+                ["bytes_out_per_sec"] = random.Next(1024, 1024 * 1024 * 8), // 1KB to 8MB
+                ["total_log_size_bytes"] = random.NextInt64(1024 * 1024, 1024L * 1024 * 1024 * 10), // 1MB to 10GB
+                ["active_controller_count"] = 1,
+                ["offline_partitions"] = random.Next(0, 3),
+                ["under_replicated_partitions"] = random.Next(0, 2),
+                ["consumer_lag_sum"] = random.Next(0, 10000),
+                ["request_rate"] = random.Next(50, 5000),
+                ["response_rate"] = random.Next(45, 4800),
+                ["network_requests_per_sec"] = random.Next(100, 2000),
+                ["cpu_utilization"] = random.NextDouble() * 100,
+                ["memory_utilization"] = random.NextDouble() * 100,
+                ["disk_utilization"] = random.NextDouble() * 80,
+                ["jvm_heap_used_percent"] = random.NextDouble() * 90
+            }
+        };
+    }
+
+    private async Task CreateKafkaClusterAsync(string clusterName, ServiceInstance serviceInstance)
+    {
+        _logger.LogInformation("Created Kafka cluster {ClusterName} for tenant {TenantId}", 
+            clusterName, serviceInstance.TenantId);
+        
+        // Simulate cluster creation time
+        await Task.Delay(200);
+        
+        // Create default topics
+        var defaultTopics = new[] { "events", "logs", "notifications", "metrics" };
+        foreach (var topic in defaultTopics)
+        {
+            _logger.LogDebug("Created default topic {Topic} in cluster {ClusterName}", 
+                topic, clusterName);
+        }
+    }
+
+    private async Task DeleteKafkaClusterAsync(string clusterName)
+    {
+        _logger.LogInformation("Deleted Kafka cluster {ClusterName}", clusterName);
+        await Task.Delay(150);
+    }
+
+    private string GenerateApiKey()
+    {
+        return Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("=", "").Replace("+", "").Replace("/", "")[..32];
+    }
+}
+
 // S3-like Storage Provider
 public class S3StorageServiceProvider : IServiceProvider
 {
@@ -75,9 +225,9 @@ public class S3StorageServiceProvider : IServiceProvider
             ApiKey = apiKey,
             Metadata = new Dictionary<string, object>
             {
-                ["bucketName"] = bucketName,
-                ["region"] = "us-east-1",
-                ["encryption"] = "AES256"
+                { "bucketName", bucketName },
+                { "region", "us-east-1" },
+                { "encryption", "AES256" }
             }
         };
     }
@@ -113,8 +263,8 @@ public class S3StorageServiceProvider : IServiceProvider
             LastChecked = DateTime.UtcNow,
             Details = new Dictionary<string, object>
             {
-                ["health"] = "healthy",
-                ["uptime"] = "100%"
+                { "health", "healthy" },
+                { "uptime", "100%" }
             }
         };
     }
@@ -188,10 +338,10 @@ public class RDSDatabaseServiceProvider : IServiceProvider
             ApiKey = apiKey,
             Metadata = new Dictionary<string, object>
             {
-                ["databaseName"] = databaseName,
-                ["engine"] = "postgresql",
-                ["version"] = "15.0",
-                ["maxConnections"] = 100
+                { "databaseName", databaseName },
+                { "engine", "postgresql" },
+                { "version", "15.0" },
+                { "maxConnections", 100 }
             }
         };
     }
@@ -230,9 +380,9 @@ public class RDSDatabaseServiceProvider : IServiceProvider
             LastChecked = DateTime.UtcNow,
             Details = new Dictionary<string, object>
             {
-                ["connections"] = new Random().Next(5, 50),
-                ["cpu_utilization"] = Math.Round(new Random().NextDouble() * 100, 2),
-                ["memory_utilization"] = Math.Round(new Random().NextDouble() * 100, 2)
+                { "connections", new Random().Next(5, 50) },
+                { "cpu_utilization", Math.Round(new Random().NextDouble() * 100, 2) },
+                { "memory_utilization", Math.Round(new Random().NextDouble() * 100, 2) }
             }
         };
     }
@@ -303,10 +453,10 @@ public class NoSQLDatabaseServiceProvider : IServiceProvider
             ApiKey = apiKey,
             Metadata = new Dictionary<string, object>
             {
-                ["namespace"] = $"tenant-{serviceInstance.TenantId}",
-                ["readCapacity"] = 5,
-                ["writeCapacity"] = 5,
-                ["encryption"] = true
+                { "namespace", $"tenant-{serviceInstance.TenantId}" },
+                { "readCapacity", 5 },
+                { "writeCapacity", 5 },
+                { "encryption", true }
             }
         };
     }
@@ -336,8 +486,8 @@ public class NoSQLDatabaseServiceProvider : IServiceProvider
             LastChecked = DateTime.UtcNow,
             Details = new Dictionary<string, object>
             {
-                ["throughput"] = "provisioned",
-                ["health"] = "healthy"
+                { "throughput", "provisioned" },
+                { "health", "healthy" }
             }
         };
     }
@@ -369,6 +519,116 @@ public class NoSQLDatabaseServiceProvider : IServiceProvider
     private async Task DeleteNoSQLNamespaceAsync(ServiceInstance serviceInstance)
     {
         _logger.LogInformation("Deleted NoSQL namespace for tenant {TenantId}", serviceInstance.TenantId);
+        await Task.Delay(100);
+    }
+
+    private string GenerateApiKey()
+    {
+        return Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("=", "").Replace("+", "").Replace("/", "")[..32];
+    }
+}
+
+// SQS-like Queue Provider
+public class QueueServiceProvider : IServiceProvider
+{
+    public string ServiceType => "Queue";
+    private readonly ILogger<QueueServiceProvider> _logger;
+    private readonly IConfiguration _configuration;
+
+    public QueueServiceProvider(ILogger<QueueServiceProvider> logger, IConfiguration configuration)
+    {
+        _logger = logger;
+        _configuration = configuration;
+    }
+
+    public async Task<ServiceProvisioningResult> ProvisionAsync(ServiceInstance serviceInstance)
+    {
+        _logger.LogInformation("Provisioning Queue service for service {ServiceId}", serviceInstance.Id);
+
+        var queueName = $"tenant-{serviceInstance.TenantId}-queue-{serviceInstance.Id}";
+        var apiKey = GenerateApiKey();
+        var endpointUrl = $"{_configuration["ServiceEndpoints:BaseUrl"]}/queue/{serviceInstance.TenantId}/{serviceInstance.Id}";
+
+        // Create queue
+        await CreateQueueAsync(queueName, serviceInstance);
+
+        return new ServiceProvisioningResult
+        {
+            Success = true,
+            EndpointUrl = endpointUrl,
+            ApiKey = apiKey,
+            Metadata = new Dictionary<string, object>
+            {
+                { "queueName", queueName },
+                { "queueType", "standard" },
+                { "retentionPeriod", 345600 },
+                { "maxReceiveCount", 10 }
+            }
+        };
+    }
+
+    public async Task<ServiceProvisioningResult> DeprovisionAsync(ServiceInstance serviceInstance)
+    {
+        _logger.LogInformation("Deprovisioning Queue service for service {ServiceId}", serviceInstance.Id);
+        
+        var queueName = $"tenant-{serviceInstance.TenantId}-queue-{serviceInstance.Id}";
+        await DeleteQueueAsync(queueName);
+        
+        return new ServiceProvisioningResult { Success = true };
+    }
+
+    public async Task<ServiceProvisioningResult> StartAsync(ServiceInstance serviceInstance)
+    {
+        return new ServiceProvisioningResult { Success = true };
+    }
+
+    public async Task<ServiceProvisioningResult> StopAsync(ServiceInstance serviceInstance)
+    {
+        return new ServiceProvisioningResult { Success = true };
+    }
+
+    public async Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
+    {
+        var random = new Random();
+        return new ServiceStatus
+        {
+            Status = "Running",
+            LastChecked = DateTime.UtcNow,
+            Details = new Dictionary<string, object>
+            {
+                { "messagesVisible", random.Next(0, 100) },
+                { "messagesInFlight", random.Next(0, 20) },
+                { "health", "healthy" }
+            }
+        };
+    }
+
+    public async Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
+    {
+        var random = new Random();
+        return new ServiceMetrics
+        {
+            ServiceInstanceId = serviceInstance.Id,
+            Timestamp = DateTime.UtcNow,
+            Metrics = new Dictionary<string, double>
+            {
+                ["messages_visible"] = random.Next(0, 1000),
+                ["messages_sent"] = random.Next(10, 500),
+                ["messages_received"] = random.Next(5, 400),
+                ["approximate_age_seconds"] = random.NextDouble() * 3600
+            }
+        };
+    }
+
+    private async Task CreateQueueAsync(string queueName, ServiceInstance serviceInstance)
+    {
+        _logger.LogInformation("Created queue {QueueName}", queueName);
+        await Task.Delay(100);
+    }
+
+    private async Task DeleteQueueAsync(string queueName)
+    {
+        _logger.LogInformation("Deleted queue {QueueName}", queueName);
         await Task.Delay(100);
     }
 

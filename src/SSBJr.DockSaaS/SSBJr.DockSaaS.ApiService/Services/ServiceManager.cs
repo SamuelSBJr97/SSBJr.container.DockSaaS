@@ -233,6 +233,9 @@ public class ServiceManager : IServiceManager
             case "Function":
                 await InitializeFunctionAsync(serviceInstance);
                 break;
+            case "Kafka":
+                await InitializeKafkaAsync(serviceInstance);
+                break;
             default:
                 _logger.LogWarning("Unknown service type: {ServiceType}", serviceType);
                 break;
@@ -302,5 +305,20 @@ public class ServiceManager : IServiceManager
         // Initialize function service
         _logger.LogInformation("Initializing Function service for {ServiceInstanceId}", serviceInstance.Id);
         await Task.Delay(1500); // Simulate function deployment time
+    }
+
+    private async Task InitializeKafkaAsync(ServiceInstance serviceInstance)
+    {
+        // Initialize Kafka cluster
+        _logger.LogInformation("Initializing Kafka cluster for {ServiceInstanceId}", serviceInstance.Id);
+        await Task.Delay(800); // Simulate cluster initialization time
+        
+        // Create default topics
+        var defaultTopics = new[] { "events", "logs", "notifications", "metrics" };
+        foreach (var topic in defaultTopics)
+        {
+            _logger.LogDebug("Created default topic {Topic} for service {ServiceInstanceId}", 
+                topic, serviceInstance.Id);
+        }
     }
 }
