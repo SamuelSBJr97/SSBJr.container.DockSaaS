@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SSBJr.container.DockSaaS.ApiService.Data;
@@ -11,9 +12,11 @@ using SSBJr.container.DockSaaS.ApiService.Data;
 namespace SSBJr.container.DockSaaS.ApiService.Migrations
 {
     [DbContext(typeof(DockSaaSDbContext))]
-    partial class DockSaaSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250912023829_AddCurrentApiCallsAndCurrentStorageToTenant")]
+    partial class AddCurrentApiCallsAndCurrentStorageToTenant
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

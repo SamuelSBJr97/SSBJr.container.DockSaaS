@@ -30,7 +30,7 @@ public class JwtService : IJwtService
         var key = Encoding.ASCII.GetBytes(jwtSettings["Secret"] ?? throw new InvalidOperationException("JWT Secret not configured"));
         var issuer = jwtSettings["Issuer"];
         var audience = jwtSettings["Audience"];
-        var expiryInHours = int.Parse(jwtSettings["ExpiryInHours"] ?? "24");
+        var expiryHours = int.Parse(jwtSettings["ExpirationInHours"] ?? "24");
 
         var claims = new List<Claim>
         {
@@ -38,16 +38,19 @@ public class JwtService : IJwtService
             new(ClaimTypes.Email, user.Email ?? ""),
             new(ClaimTypes.Name, user.FullName),
             new("tenant_id", user.TenantId.ToString()),
+            new("TenantId", user.TenantId.ToString()), // Alternative claim name
             new("first_name", user.FirstName),
-            new("last_name", user.LastName)
+            new("last_name", user.LastName),
+            new("is_active", user.IsActive.ToString().ToLower())
         };
 
+        // Add roles
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddHours(expiryInHours),
+            Expires = DateTime.UtcNow.AddHours(expiryHours),
             Issuer = issuer,
             Audience = audience,
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)

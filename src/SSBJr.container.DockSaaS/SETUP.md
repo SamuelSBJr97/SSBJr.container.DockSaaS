@@ -14,13 +14,50 @@
    - Monitor all services, databases, and logs from the dashboard
 
 3. **Services will be available at:**
-   - API Service: `https://localhost:7000`
-   - Blazor Web: `https://localhost:7001`
+   - API Service: `https://localhost:7000` (HTTPS) / `http://localhost:5200` (HTTP)
+   - Blazor Web: `https://localhost:7001` (HTTPS) / `http://localhost:5201` (HTTP)
    - PostgreSQL: Managed by Aspire (connection string provided automatically)
    - Redis: Managed by Aspire
    - pgAdmin: Available through Aspire dashboard
 
+## ?? Default Admin User
+
+A default administrator user is automatically created during database initialization:
+
+**Default Admin Credentials:**
+- **Email:** `admin@docksaas.com`
+- **Password:** `Admin123!`
+- **Tenant:** `DockSaaS`
+- **Role:** `Admin`
+
+?? **IMPORTANT:** Change this password immediately in production environments!
+
+### How to Login
+1. Go to `https://localhost:7001`
+2. Click "Sign In"
+3. Enter the default credentials above
+4. You'll have full admin access to the system
+
 ## Fixed Issues
+
+### ? Port Conflict Resolution
+**Issue Fixed**: Port 5000/5001 conflicts with other services
+
+**Solution**: 
+- Changed API HTTP port from 5000 to 5200
+- Changed Web HTTP port from 5001 to 5201
+- Updated CORS configuration accordingly
+- HTTPS ports remain unchanged (7000/7001)
+
+### ? Default Admin User Creation
+**New Feature**: Automatic creation of default administrator account
+
+**What was added:**
+1. **Default Tenant**: `DockSaaS` tenant created automatically
+2. **Admin User**: `admin@docksaas.com` with Admin role
+3. **Secure Password**: `Admin123!` (follows security requirements)
+4. **Logging**: Clear logs about admin user creation
+5. **Production Warning**: Reminder to change password
 
 ### ? JavaScript Interop Error Resolution
 Fixed the JavaScript interoperability error during prerendering:
@@ -54,6 +91,56 @@ Enhanced database connection handling with:
 - **`/login`** - Login/Register page
 - **`/health`** - Application health status
 
+## Port Configuration
+
+### Aspire Managed Ports
+- **API Service**: 
+  - HTTPS: `https://localhost:7000`
+  - HTTP: `http://localhost:5200`
+- **Blazor Web**: 
+  - HTTPS: `https://localhost:7001`
+  - HTTP: `http://localhost:5201`
+- **Aspire Dashboard**: `https://localhost:17090`
+- **PostgreSQL**: Managed by Aspire (dynamic port)
+- **Redis**: Managed by Aspire (dynamic port)
+
+### Port Conflict Solutions
+If you encounter port conflicts:
+
+1. **Check what's using the port:**
+```bash
+# Windows
+netstat -ano | findstr :5200
+netstat -ano | findstr :7000
+
+# Linux/Mac
+lsof -i :5200
+lsof -i :7000
+```
+
+2. **Stop conflicting services:**
+```bash
+# Windows - kill process by PID
+taskkill /PID <PID> /F
+
+# Linux/Mac - kill process by PID
+kill -9 <PID>
+```
+
+3. **Alternative: Change ports in AppHost.cs if needed**
+
+## User Management
+
+### Default Setup
+1. **System Admin**: `admin@docksaas.com` (created automatically)
+2. **First User Registration**: Creates new tenant with admin role
+3. **Subsequent Users**: Added as regular users to existing tenant
+
+### Creating Additional Users
+- **Admin Access**: Use the default admin account
+- **User Management**: Navigate to `/users` (Admin/Manager only)
+- **Self Registration**: Users can register for new tenants
+
 ## Technical Improvements
 
 ### Prerendering Support
@@ -67,6 +154,7 @@ The application now properly handles Blazor Server prerendering:
 - ? Secure token storage in browser localStorage  
 - ? Automatic token expiration handling
 - ? Seamless login/logout experience
+- ? Default admin user for immediate access
 
 ## Running Standalone (Without Aspire)
 
@@ -93,20 +181,38 @@ If you prefer to run services individually:
 
 ## Troubleshooting
 
+### Port Conflict Issues
+
+**If you see "bind: address already in use" errors:**
+1. Check if other applications are using ports 5200, 7000, 7001
+2. Common conflicting services:
+   - IIS Express
+   - Other .NET applications
+   - Docker containers
+   - Visual Studio debug sessions
+
+**Solutions:**
+1. Stop conflicting services
+2. Change ports in `AppHost.cs`
+3. Use different port ranges entirely
+
+### Default Admin User Issues
+
+**If admin user is not created:**
+1. Check database initialization logs
+2. Verify database connectivity
+3. Ensure roles are created first
+4. Check for any constraint violations
+
+**If you can't login with default credentials:**
+1. Verify the user exists in database
+2. Check if password policy is met
+3. Ensure tenant `DockSaaS` exists
+4. Try creating a new user instead
+
 ### JavaScript Interop Error Fixed
 ? **Issue**: `JavaScript interop calls cannot be issued at this time`  
 ? **Solution**: Added prerendering detection and deferred localStorage access
-
-**What was causing the error:**
-1. AuthService trying to access localStorage during server-side prerendering
-2. CustomAuthenticationStateProvider calling localStorage before JavaScript was available
-3. Components checking authentication state during initial render
-
-**How it's fixed:**
-1. Added `IsJavaScriptRuntimeAvailable()` method to detect prerendering
-2. Deferred localStorage operations until client-side rendering
-3. Used `OnAfterRenderAsync` for authentication checks
-4. Added proper exception handling for JavaScript interop errors
 
 ### 404 Error Fixed
 ? **Issue**: Web application showing 404 error  
@@ -124,6 +230,16 @@ If you see `Failed to connect to 127.0.0.1:5432`:
 ### Common Commands
 
 ```bash
+# Check port usage (Windows)
+netstat -ano | findstr :5200
+netstat -ano | findstr :7000
+netstat -ano | findstr :7001
+
+# Check port usage (Linux/Mac)
+lsof -i :5200
+lsof -i :7000
+lsof -i :7001
+
 # Check PostgreSQL status (Windows)
 sc query postgresql-x64-15
 
@@ -133,7 +249,7 @@ sudo systemctl status postgresql
 # Connect to database manually
 psql -h localhost -U postgres -d docksaasdb
 
-# Reset database
+# Reset database (will recreate admin user)
 dotnet ef database drop --project SSBJr.container.DockSaaS.ApiService
 
 # Build all projects
@@ -157,10 +273,28 @@ dotnet clean && dotnet build
    - Go to `https://localhost:7001` for the web application
    - Go to `https://localhost:17090` for the Aspire dashboard
 
-3. **First Time Setup:**
-   - Visit `/welcome` to learn about the application
-   - Click "Sign Up" to create your first account
-   - The database will be automatically created and seeded
+3. **Login with Default Admin:**
+   - Email: `admin@docksaas.com`
+   - Password: `Admin123!`
+   - Full admin access immediately available
+
+4. **Optional - Create Your Own Account:**
+   - Click "Sign Up" to create your own tenant and account
+   - First user in new tenant automatically becomes admin
+
+## Security Notes
+
+### Default Credentials
+- **Development**: Default admin credentials are fine for local development
+- **Production**: **MUST** change default password immediately
+- **Best Practice**: Create your own admin account and disable/delete default one
+
+### Password Requirements
+- Minimum 8 characters
+- At least 1 uppercase letter
+- At least 1 lowercase letter  
+- At least 1 digit
+- Special characters allowed but not required
 
 ## Environment Variables
 
@@ -179,9 +313,13 @@ The application supports these environment variables:
 - **Architecture**: Clean separation between API service and Blazor web app
 - **Orchestration**: .NET Aspire for local development and testing
 - **Prerendering**: Fully supported with proper JavaScript interop handling
+- **Default Admin**: Automatically created for immediate access
+- **Port Management**: Configured to avoid common conflicts
 
 ## Status Summary
 
+- ? **Port Configuration**: Fixed conflicts (5200/5201 for HTTP, 7000/7001 for HTTPS)
+- ? **Default Admin User**: Created automatically (`admin@docksaas.com`)
 - ? **JavaScript Interop**: Fixed prerendering issues
 - ? **404 Error**: Resolved routing problems
 - ? **Database Connection**: Enhanced with retry logic
@@ -189,3 +327,4 @@ The application supports these environment variables:
 - ? **Navigation**: Improved for all user states
 - ? **Build**: Compiling successfully
 - ? **Prerendering**: Properly supported
+- ? **User Management**: Multi-tenant with role-based access

@@ -8,6 +8,8 @@ public interface IDashboardService
     Task<List<AuditLogDto>> GetRecentActivitiesAsync(int limit = 10);
     Task<object?> GetServiceMetricsAsync(Guid serviceInstanceId, int hours = 24);
     Task<object?> GetTenantOverviewAsync();
+    Task<object?> GetSystemHealthAsync();
+    Task<object?> GetUsageTrendsAsync(int days = 7);
 }
 
 public class DashboardService : IDashboardService
@@ -70,6 +72,32 @@ public class DashboardService : IDashboardService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get tenant overview");
+            return null;
+        }
+    }
+
+    public async Task<object?> GetSystemHealthAsync()
+    {
+        try
+        {
+            return await _apiClient.GetAsync<object>("api/dashboard/system-health");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get system health");
+            return null;
+        }
+    }
+
+    public async Task<object?> GetUsageTrendsAsync(int days = 7)
+    {
+        try
+        {
+            return await _apiClient.GetAsync<object>($"api/dashboard/usage-trends?days={days}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get usage trends");
             return null;
         }
     }

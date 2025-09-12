@@ -14,27 +14,23 @@ var redis = builder.AddRedis("redis")
     .WithDataVolume()
     .WithRedisCommander();
 
-// Add API Service
+// Add API Service (internal network only)
 var apiService = builder.AddProject<Projects.SSBJr_container_DockSaaS_ApiService>("apiservice")
     .WithReference(docksaasdb)
     .WithReference(redis)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
-    .WithEnvironment("ServiceEndpoints__BaseUrl", "https://localhost:7000")
-    .WithHttpsEndpoint(port: 7000, name: "api-https")
-    .WithHttpEndpoint(port: 5000, name: "api-http");
+    .WithEnvironment("ServiceEndpoints__BaseUrl", "http://apiservice"); // Internal network name
 
-// Add Blazor Web Service
+// Add Blazor Web Service (internal network only)
 var webService = builder.AddProject<Projects.SSBJr_container_DockSaaS_Web>("webservice")
     .WithReference(apiService)
     .WithReference(redis)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
-    .WithEnvironment("ApiBaseUrl", "https://localhost:7000")
-    .WithHttpsEndpoint(port: 7001, name: "web-https")
-    .WithHttpEndpoint(port: 5001, name: "web-http");
+    .WithEnvironment("ApiBaseUrl", "http://apiservice"); // Internal network name
 
 // Configure service discovery
-apiService.WithEnvironment("BlazorClientUrls", "https://localhost:7001,http://localhost:5001");
-webService.WithEnvironment("ApiServiceUrl", apiService.GetEndpoint("api-https"));
+apiService.WithEnvironment("BlazorClientUrls", "http://webservice"); // Internal network name
+webService.WithEnvironment("ApiServiceUrl", "http://apiservice"); // Internal network name
 
 var app = builder.Build();
 

@@ -195,24 +195,4 @@
         loginRequest = new();
         registerRequest = new();
     }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            // Check if user is already authenticated (only after first render when JS is available)
-            try
-            {
-                if (await AuthService.IsAuthenticatedAsync())
-                {
-                    Navigation.NavigateTo("/");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log but don't fail if authentication check fails
-                Console.WriteLine($"Error checking authentication: {ex.Message}");
-            }
-        }
-    }
 }

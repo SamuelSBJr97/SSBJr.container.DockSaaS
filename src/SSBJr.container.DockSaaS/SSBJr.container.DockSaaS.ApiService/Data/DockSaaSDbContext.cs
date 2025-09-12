@@ -32,6 +32,22 @@ public class DockSaaSDbContext : IdentityDbContext<User, Role, Guid>
     {
         base.OnModelCreating(builder);
 
+        // Ensure all entities are included in migrations
+        builder.Entity<Tenant>();
+        builder.Entity<ServiceDefinition>();
+        builder.Entity<ServiceInstance>();
+        builder.Entity<ServiceMetric>();
+        builder.Entity<AuditLog>();
+        builder.Entity<UsageRecord>();
+        builder.Entity<BillingAlert>();
+        builder.Entity<ServiceTemplate>();
+        builder.Entity<ApiKey>();
+        builder.Entity<Models.Notification>();
+        builder.Entity<ServiceBackup>();
+        builder.Entity<TenantSettings>();
+        builder.Entity<ServiceEvent>();
+        builder.Entity<TenantInvitation>();
+
         // Configure User entity
         builder.Entity<User>(entity =>
         {
@@ -60,11 +76,20 @@ public class DockSaaSDbContext : IdentityDbContext<User, Role, Guid>
         builder.Entity<Tenant>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.Email).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Email).HasMaxLength(255);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.LogoUrl).HasMaxLength(255);
             entity.Property(e => e.Plan).HasMaxLength(50).HasDefaultValue("Free");
+            entity.Property(e => e.UserLimit).HasDefaultValue(10);
+            entity.Property(e => e.StorageLimit).HasDefaultValue(1073741824L);
+            entity.Property(e => e.ApiCallsLimit).HasDefaultValue(10000);
+            entity.Property(e => e.CurrentStorage).HasDefaultValue(0L);
+            entity.Property(e => e.CurrentApiCalls).HasDefaultValue(0);
+            entity.Property(e => e.CreatedAt);
+            entity.Property(e => e.UpdatedAt);
+            entity.Property(e => e.IsActive);
             entity.HasIndex(e => e.Name).IsUnique();
-            entity.HasIndex(e => e.Email).IsUnique();
         });
 
         // Configure ServiceDefinition entity

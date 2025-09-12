@@ -101,7 +101,7 @@ builder.Services.AddScoped<SSBJr.container.DockSaaS.ApiService.Services.IService
 builder.Services.AddScoped<SSBJr.container.DockSaaS.ApiService.Services.IServiceProvider, NoSQLDatabaseServiceProvider>();
 builder.Services.AddScoped<IServiceInstanceProviders, ServiceInstanceProviders>();
 
-// Configure background services for metrics collection
+// Configure background services for metrics collection and data generation
 builder.Services.AddHostedService<MetricsCollectionService>();
 builder.Services.AddHostedService<BillingProcessingService>();
 builder.Services.AddHostedService<NotificationService>();
@@ -117,10 +117,16 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowBlazorClient",
         policy =>
         {
-            policy.WithOrigins("https://localhost:7001", "http://localhost:5001") // Blazor client URLs
+            policy.WithOrigins(
+                    "https://localhost:7001", 
+                    "http://localhost:5201",
+                    "https://localhost:7088", // Fallback port from launchSettings
+                    "http://localhost:5288"   // Fallback port from launchSettings
+                  )
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .AllowCredentials();
+                  .AllowCredentials()
+                  .SetIsOriginAllowed((host) => true); // Allow any origin in development
         });
 });
 
@@ -223,6 +229,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<DockSaaSDbContext>();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<Role>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
@@ -256,6 +263,9 @@ await using (var scope = app.Services.CreateAsyncScope())
                     });
                 }
             }
+
+            // Seed default admin user and tenant
+            await SeedDefaultAdminAsync(context, userManager, logger);
 
             // Seed service definitions
             await SeedServiceDefinitionsAsync(context);
@@ -304,6 +314,75 @@ await using (var scope = app.Services.CreateAsyncScope())
 app.Run();
 
 // Seeding methods
+static async Task SeedDefaultAdminAsync(DockSaaSDbContext context, UserManager<User> userManager, Microsoft.Extensions.Logging.ILogger logger)
+{
+    try
+    {
+        // Check if there's already a default tenant
+        var defaultTenant = await context.Tenants.FirstOrDefaultAsync(t => t.Name == "DockSaaS");
+        
+        if (defaultTenant == null)
+        {
+            defaultTenant = new Tenant
+            {
+                Id = Guid.NewGuid(),
+                Name = "DockSaaS",
+                Description = "Default DockSaaS tenant for administration",
+                Plan = "Enterprise",
+                UserLimit = 100,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            context.Tenants.Add(defaultTenant);
+            await context.SaveChangesAsync();
+            logger.LogInformation("Default tenant 'DockSaaS' created");
+        }
+
+        // Check if admin user already exists
+        var adminUser = await userManager.FindByEmailAsync("admin@docksaas.com");
+        
+        if (adminUser == null)
+        {
+            adminUser = new User
+            {
+                Id = Guid.NewGuid(),
+                UserName = "admin@docksaas.com",
+                Email = "admin@docksaas.com",
+                EmailConfirmed = true,
+                FirstName = "System",
+                LastName = "Administrator",
+                TenantId = defaultTenant.Id,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                LastLoginAt = DateTime.UtcNow
+            };
+
+            var result = await userManager.CreateAsync(adminUser, "Admin123!");
+            
+            if (result.Succeeded)
+            {
+                await userManager.AddToRoleAsync(adminUser, "Admin");
+                logger.LogInformation("Default admin user created: admin@docksaas.com / Admin123!");
+                logger.LogWarning("??  IMPORTANT: Change the default admin password in production!");
+            }
+            else
+            {
+                logger.LogError("Failed to create default admin user: {Errors}", 
+                    string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            logger.LogInformation("Default admin user already exists");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to seed default admin user");
+    }
+}
+
 static async Task SeedServiceDefinitionsAsync(DockSaaSDbContext context)
 {
     if (!context.ServiceDefinitions.Any())

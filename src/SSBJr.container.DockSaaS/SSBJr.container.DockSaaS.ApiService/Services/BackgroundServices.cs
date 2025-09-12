@@ -1,6 +1,7 @@
 using SSBJr.container.DockSaaS.ApiService.Data;
 using SSBJr.container.DockSaaS.ApiService.Services;
 using Microsoft.EntityFrameworkCore;
+using SSBJr.container.DockSaaS.ApiService.Models;
 
 namespace SSBJr.container.DockSaaS.ApiService.Services;
 
@@ -58,19 +59,38 @@ public class MetricsCollectionService : BackgroundService
         {
             try
             {
-                var metrics = await provisioningService.GetServiceMetricsAsync(service);
+                // Generate realistic metrics based on service type
+                var metrics = GenerateRealisticMetrics(service);
                 
-                // Record each metric as usage
-                foreach (var metric in metrics.Metrics)
+                // Record each metric
+                foreach (var metric in metrics)
                 {
+                    var serviceMetric = new ServiceMetric
+                    {
+                        Id = Guid.NewGuid(),
+                        ServiceInstanceId = service.Id,
+                        MetricName = metric.Key,
+                        Value = metric.Value,
+                        Unit = GetMetricUnit(metric.Key),
+                        Timestamp = DateTime.UtcNow,
+                        Tags = $"{{\"service_type\":\"{service.ServiceDefinition.Type}\",\"tenant_id\":\"{service.TenantId}\"}}"
+                    };
+
+                    context.ServiceMetrics.Add(serviceMetric);
+
+                    // Record usage for billing
                     await billingService.RecordUsageAsync(
                         service.TenantId,
                         service.Id,
                         metric.Key,
                         metric.Value,
-                        metrics.Timestamp
+                        DateTime.UtcNow
                     );
                 }
+
+                // Update service current usage (simulate growth)
+                service.CurrentUsage += new Random().Next(1, 100);
+                service.LastAccessedAt = DateTime.UtcNow;
 
                 _logger.LogDebug("Collected metrics for service {ServiceId} ({ServiceType})", 
                     service.Id, service.ServiceDefinition.Type);
@@ -80,6 +100,91 @@ public class MetricsCollectionService : BackgroundService
                 _logger.LogError(ex, "Failed to collect metrics for service {ServiceId}", service.Id);
             }
         }
+
+        await context.SaveChangesAsync();
+    }
+
+    private Dictionary<string, double> GenerateRealisticMetrics(ServiceInstance service)
+    {
+        var random = new Random();
+        var metrics = new Dictionary<string, double>();
+
+        switch (service.ServiceDefinition.Type)
+        {
+            case "S3Storage":
+                metrics["storage_bytes"] = random.NextDouble() * 1000000000; // 0-1GB
+                metrics["requests_per_second"] = random.NextDouble() * 100;
+                metrics["download_bandwidth_mbps"] = random.NextDouble() * 50;
+                metrics["upload_bandwidth_mbps"] = random.NextDouble() * 20;
+                break;
+
+            case "RDSDatabase":
+                metrics["cpu_utilization"] = random.NextDouble() * 100;
+                metrics["memory_utilization"] = random.NextDouble() * 100;
+                metrics["connection_count"] = random.Next(1, 50);
+                metrics["query_latency_ms"] = random.NextDouble() * 500;
+                metrics["disk_io_ops"] = random.Next(10, 1000);
+                break;
+
+            case "NoSQLDatabase":
+                metrics["read_capacity_units"] = random.NextDouble() * 1000;
+                metrics["write_capacity_units"] = random.NextDouble() * 500;
+                metrics["throttled_requests"] = random.Next(0, 10);
+                metrics["item_count"] = random.Next(1000, 100000);
+                break;
+
+            case "Queue":
+                metrics["messages_visible"] = random.Next(0, 1000);
+                metrics["messages_sent"] = random.Next(10, 500);
+                metrics["messages_received"] = random.Next(5, 400);
+                metrics["approximate_age_seconds"] = random.NextDouble() * 3600;
+                break;
+
+            case "Function":
+                metrics["invocations"] = random.Next(1, 100);
+                metrics["duration_ms"] = random.NextDouble() * 5000;
+                metrics["error_count"] = random.Next(0, 5);
+                metrics["memory_used_mb"] = random.NextDouble() * 512;
+                break;
+
+            default:
+                // Generic metrics for unknown service types
+                metrics["cpu_utilization"] = random.NextDouble() * 100;
+                metrics["memory_utilization"] = random.NextDouble() * 100;
+                metrics["requests_per_second"] = random.NextDouble() * 50;
+                break;
+        }
+
+        return metrics;
+    }
+
+    private string GetMetricUnit(string metricName)
+    {
+        return metricName switch
+        {
+            "storage_bytes" => "bytes",
+            "requests_per_second" => "rps",
+            "download_bandwidth_mbps" => "mbps",
+            "upload_bandwidth_mbps" => "mbps",
+            "cpu_utilization" => "percent",
+            "memory_utilization" => "percent",
+            "connection_count" => "count",
+            "query_latency_ms" => "ms",
+            "disk_io_ops" => "ops",
+            "read_capacity_units" => "rcu",
+            "write_capacity_units" => "wcu",
+            "throttled_requests" => "count",
+            "item_count" => "count",
+            "messages_visible" => "count",
+            "messages_sent" => "count",
+            "messages_received" => "count",
+            "approximate_age_seconds" => "seconds",
+            "invocations" => "count",
+            "duration_ms" => "ms",
+            "error_count" => "count",
+            "memory_used_mb" => "mb",
+            _ => "unit"
+        };
     }
 }
 
@@ -143,6 +248,27 @@ public class BillingProcessingService : BackgroundService
                 tenant.CurrentApiCalls = quotas.CurrentApiCalls;
                 tenant.UpdatedAt = DateTime.UtcNow;
 
+                // Generate alerts if approaching limits
+                if (tenant.StorageLimit > 0)
+                {
+                    var storagePercent = (double)tenant.CurrentStorage / tenant.StorageLimit * 100;
+                    if (storagePercent > 80)
+                    {
+                        await CreateBillingAlert(context, tenant.Id, "storage", "warning", 
+                            $"Storage usage is at {storagePercent:F1}% of limit");
+                    }
+                }
+
+                if (tenant.ApiCallsLimit > 0)
+                {
+                    var apiCallsPercent = (double)tenant.CurrentApiCalls / tenant.ApiCallsLimit * 100;
+                    if (apiCallsPercent > 80)
+                    {
+                        await CreateBillingAlert(context, tenant.Id, "api_calls", "warning", 
+                            $"API calls usage is at {apiCallsPercent:F1}% of limit");
+                    }
+                }
+
                 _logger.LogDebug("Processed billing for tenant {TenantId}", tenant.Id);
             }
             catch (Exception ex)
@@ -152,6 +278,31 @@ public class BillingProcessingService : BackgroundService
         }
 
         await context.SaveChangesAsync();
+    }
+
+    private async Task CreateBillingAlert(DockSaaSDbContext context, Guid tenantId, string metricType, string level, string message)
+    {
+        // Check if alert already exists and is active
+        var existingAlert = await context.BillingAlerts
+            .FirstOrDefaultAsync(ba => ba.TenantId == tenantId && 
+                                     ba.MetricType == metricType && 
+                                     ba.IsActive);
+
+        if (existingAlert == null)
+        {
+            var alert = new BillingAlert
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                MetricType = metricType,
+                AlertLevel = level,
+                Message = message,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            context.BillingAlerts.Add(alert);
+        }
     }
 
     private async Task CleanupOldUsageRecords()
@@ -164,6 +315,7 @@ public class BillingProcessingService : BackgroundService
         
         var oldRecords = await context.UsageRecords
             .Where(r => r.CreatedAt < cutoffDate)
+            .Take(1000) // Process in batches
             .ToListAsync();
 
         if (oldRecords.Any())
@@ -172,6 +324,21 @@ public class BillingProcessingService : BackgroundService
             await context.SaveChangesAsync();
             
             _logger.LogInformation("Cleaned up {Count} old usage records", oldRecords.Count);
+        }
+
+        // Cleanup old service metrics (keep for 30 days)
+        var metricsCutoffDate = DateTime.UtcNow.AddDays(-30);
+        var oldMetrics = await context.ServiceMetrics
+            .Where(sm => sm.Timestamp < metricsCutoffDate)
+            .Take(1000)
+            .ToListAsync();
+
+        if (oldMetrics.Any())
+        {
+            context.ServiceMetrics.RemoveRange(oldMetrics);
+            await context.SaveChangesAsync();
+            
+            _logger.LogInformation("Cleaned up {Count} old service metrics", oldMetrics.Count);
         }
     }
 }

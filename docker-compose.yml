@@ -1,0 +1,171 @@
+﻿version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: docksaas-postgres
+    environment:
+      POSTGRES_DB: docksaasdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - docksaas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docksaasdb"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: docksaas-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - docksaas-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # DockSaaS API Service
+  docksaas-api:
+    build:
+      context: .
+      dockerfile: SSBJr.container.DockSaaS.ApiService/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Release
+    container_name: docksaas-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=docksaasdb;Username=postgres;Password=postgres;
+      - ConnectionStrings__Redis=redis:6379
+      - JwtSettings__Secret=DockSaaS-Super-Secret-Key-That-Should-Be-Changed-In-Production-2024!
+      - JwtSettings__Issuer=DockSaaS
+      - JwtSettings__Audience=DockSaaSUsers
+      - ServiceEndpoints__BaseUrl=http://docksaas-api:8080
+      - BlazorClientUrls=http://docksaas-web:8080,http://localhost:3000
+    ports:
+      - "5000:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - docksaas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # DockSaaS Web Service (Blazor)
+  docksaas-web:
+    build:
+      context: .
+      dockerfile: SSBJr.container.DockSaaS.Web/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Release
+    container_name: docksaas-web
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__Redis=redis:6379
+      - ApiBaseUrl=http://docksaas-api:8080
+      - ApiServiceUrl=http://docksaas-api:8080
+    ports:
+      - "3000:8080"
+    depends_on:
+      docksaas-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - docksaas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # pgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: docksaas-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@docksaas.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - docksaas-network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    restart: unless-stopped
+
+  # Redis Commander for cache management (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: docksaas-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - docksaas-network
+    restart: unless-stopped
+
+networks:
+  docksaas-network:
+    driver: bridge
+    name: docksaas-network
+
+volumes:
+  postgres_data:
+    name: docksaas-postgres-data
+  redis_data:
+    name: docksaas-redis-data
+  pgadmin_data:
+    name: docksaas-pgadmin-data

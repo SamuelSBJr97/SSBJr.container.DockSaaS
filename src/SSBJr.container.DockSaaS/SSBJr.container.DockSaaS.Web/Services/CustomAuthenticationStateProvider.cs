@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using Blazored.LocalStorage;
 using SSBJr.container.DockSaaS.Web.Models;
-using Microsoft.JSInterop;
 
 namespace SSBJr.container.DockSaaS.Web.Services;
 
@@ -10,25 +9,17 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
 {
     private readonly ILocalStorageService _localStorage;
     private readonly ILogger<CustomAuthenticationStateProvider> _logger;
-    private readonly IJSRuntime _jsRuntime;
 
-    public CustomAuthenticationStateProvider(ILocalStorageService localStorage, ILogger<CustomAuthenticationStateProvider> logger, IJSRuntime jsRuntime)
+    public CustomAuthenticationStateProvider(ILocalStorageService localStorage, ILogger<CustomAuthenticationStateProvider> logger)
     {
         _localStorage = localStorage;
         _logger = logger;
-        _jsRuntime = jsRuntime;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         try
         {
-            // During prerendering, JavaScript interop is not available
-            if (!IsJavaScriptRuntimeAvailable())
-            {
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-            }
-
             var token = await _localStorage.GetItemAsync<string>("authToken");
             var user = await _localStorage.GetItemAsync<UserDto>("currentUser");
 
@@ -38,7 +29,7 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
             }
 
             var expiry = await _localStorage.GetItemAsync<DateTime>("tokenExpiry");
-            if (expiry <= DateTime.UtcNow)
+            if (expiry != default && expiry <= DateTime.UtcNow)
             {
                 await _localStorage.RemoveItemAsync("authToken");
                 await _localStorage.RemoveItemAsync("currentUser");
@@ -64,15 +55,9 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
 
             return new AuthenticationState(principal);
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("JavaScript interop"))
-        {
-            // This happens during prerendering - return anonymous user
-            _logger.LogDebug("JavaScript interop not available during prerendering");
-            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting authentication state");
+            _logger.LogDebug(ex, "Error getting authentication state, returning anonymous user");
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
         }
     }
@@ -104,12 +89,5 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
         var principal = new ClaimsPrincipal(identity);
 
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
-    }
-
-    private bool IsJavaScriptRuntimeAvailable()
-    {
-        // Check if we're in a prerendering context
-        return _jsRuntime is not IJSInProcessRuntime && 
-               !(_jsRuntime.GetType().Name.Contains("UnsupportedJavaScriptRuntime"));
     }
 }

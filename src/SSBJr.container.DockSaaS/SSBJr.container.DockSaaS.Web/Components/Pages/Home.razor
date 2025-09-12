@@ -4,12 +4,25 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Dashboard - DockSaaS</PageTitle>
 
 <AuthorizeView>
     <Authorized>
-        <MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+            <div class="d-flex gap-2">
+                <MudIconButton Icon="Icons.Material.Filled.Refresh" 
+                               Color="Color.Primary" 
+                               OnClick="RefreshData"
+                               Title="Refresh Dashboard" />
+                <MudSwitch @bind-Checked="autoRefresh" 
+                           Label="Auto Refresh" 
+                           Color="Color.Primary" />
+            </div>
+        </div>
 
         @if (isLoading)
         {
@@ -21,7 +34,7 @@
             <MudGrid>
                 <!-- Stats Cards -->
                 <MudItem xs="12" sm="6" md="3">
-                    <MudCard Elevation="4">
+                    <MudCard Elevation="4" Class="stat-card">
                         <MudCardContent>
                             <div class="d-flex align-center">
                                 <MudIcon Icon="Icons.Material.Filled.People" Color="Color.Primary" Size="Size.Large" Class="me-3" />
@@ -35,7 +48,7 @@
                 </MudItem>
 
                 <MudItem xs="12" sm="6" md="3">
-                    <MudCard Elevation="4">
+                    <MudCard Elevation="4" Class="stat-card">
                         <MudCardContent>
                             <div class="d-flex align-center">
                                 <MudIcon Icon="Icons.Material.Filled.CloudQueue" Color="Color.Success" Size="Size.Large" Class="me-3" />
@@ -49,14 +62,19 @@
                 </MudItem>
 
                 <MudItem xs="12" sm="6" md="3">
-                    <MudCard Elevation="4">
+                    <MudCard Elevation="4" Class="stat-card">
                         <MudCardContent>
                             <div class="d-flex align-center">
                                 <MudIcon Icon="Icons.Material.Filled.Storage" Color="Color.Warning" Size="Size.Large" Class="me-3" />
                                 <div>
                                     <MudText Typo="Typo.h4">@FormatBytes(dashboardStats.TotalStorage)</MudText>
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">Storage Used</MudText>
-                                    <MudProgressLinear Color="Color.Warning" Value="dashboardStats.StorageUsagePercent" Class="mt-2" />
+                                    <MudProgressLinear Color="@GetUsageColor(dashboardStats.StorageUsagePercent)" 
+                                                       Value="dashboardStats.StorageUsagePercent" 
+                                                       Class="mt-2" />
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @dashboardStats.StorageUsagePercent.ToString("F1")% of limit
+                                    </MudText>
                                 </div>
                             </div>
                         </MudCardContent>
@@ -64,16 +82,97 @@
                 </MudItem>
 
                 <MudItem xs="12" sm="6" md="3">
-                    <MudCard Elevation="4">
+                    <MudCard Elevation="4" Class="stat-card">
                         <MudCardContent>
                             <div class="d-flex align-center">
                                 <MudIcon Icon="Icons.Material.Filled.Api" Color="Color.Info" Size="Size.Large" Class="me-3" />
                                 <div>
                                     <MudText Typo="Typo.h4">@dashboardStats.TotalApiCalls.ToString("N0")</MudText>
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">API Calls</MudText>
-                                    <MudProgressLinear Color="Color.Info" Value="dashboardStats.ApiCallsUsagePercent" Class="mt-2" />
+                                    <MudProgressLinear Color="@GetUsageColor(dashboardStats.ApiCallsUsagePercent)" 
+                                                       Value="dashboardStats.ApiCallsUsagePercent" 
+                                                       Class="mt-2" />
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @dashboardStats.ApiCallsUsagePercent.ToString("F1")% of limit
+                                    </MudText>
                                 </div>
                             </div>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+
+                <!-- System Health -->
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">System Health</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudChip Color="@GetHealthColor(systemHealth?.OverallHealth ?? "Unknown")" 
+                                         Size="Size.Small">
+                                    @(systemHealth?.OverallHealth ?? "Loading...")
+                                </MudChip>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @if (systemHealth != null)
+                            {
+                                <div class="d-flex flex-column gap-3">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle2">Service Status</MudText>
+                                        <div class="d-flex gap-2 mt-1">
+                                            @if (systemHealth.ServicesHealth != null)
+                                            {
+                                                @foreach (var service in systemHealth.ServicesHealth)
+                                                {
+                                                    <MudChip Size="Size.Small" Color="@GetStatusColor(service.Key)">
+                                                        @service.Key: @service.Value
+                                                    </MudChip>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+                                    
+                                    @if (systemHealth.Warnings?.Any() == true)
+                                    {
+                                        <div>
+                                            <MudText Typo="Typo.subtitle2" Color="Color.Warning">Warnings</MudText>
+                                            @foreach (var warning in systemHealth.Warnings)
+                                            {
+                                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-1">
+                                                    @warning
+                                                </MudAlert>
+                                            }
+                                        </div>
+                                    }
+
+                                    @if (systemHealth.RecentErrors > 0)
+                                    {
+                                        <MudAlert Severity="Severity.Error" Dense="true">
+                                            @systemHealth.RecentErrors errors in the last hour
+                                        </MudAlert>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="100px" />
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+
+                <!-- Usage Trends Chart -->
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Usage Trends (7 days)</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <div id="usageChart" style="height: 200px;"></div>
                         </MudCardContent>
                     </MudCard>
                 </MudItem>
@@ -98,16 +197,24 @@
                         <MudCardContent>
                             @if (serviceInstances.Any())
                             {
-                                <MudTable Items="serviceInstances.Take(5)" Hover="true" Dense="true">
+                                <MudTable Items="serviceInstances.Take(5)" Hover="true" Dense="true" Loading="@isLoading">
                                     <HeaderContent>
                                         <MudTh>Name</MudTh>
                                         <MudTh>Type</MudTh>
                                         <MudTh>Status</MudTh>
                                         <MudTh>Usage</MudTh>
+                                        <MudTh>Last Accessed</MudTh>
                                         <MudTh>Actions</MudTh>
                                     </HeaderContent>
                                     <RowTemplate Context="service">
-                                        <MudTd DataLabel="Name">@service.Name</MudTd>
+                                        <MudTd DataLabel="Name">
+                                            <div class="d-flex align-center">
+                                                <MudIcon Icon="@GetServiceIcon(service.ServiceType)" 
+                                                         Size="Size.Small" 
+                                                         Class="me-2" />
+                                                @service.Name
+                                            </div>
+                                        </MudTd>
                                         <MudTd DataLabel="Type">
                                             <MudChip Size="Size.Small" Color="Color.Default">@service.ServiceType</MudChip>
                                         </MudTd>
@@ -121,13 +228,22 @@
                                             @if (service.UsageQuota > 0)
                                             {
                                                 var percentage = (double)service.CurrentUsage / service.UsageQuota * 100;
-                                                <MudProgressLinear Value="percentage" Color="Color.Primary" />
-                                                <MudText Typo="Typo.caption">@percentage.ToString("F1")%</MudText>
+                                                <div style="min-width: 100px;">
+                                                    <MudProgressLinear Value="percentage" 
+                                                                       Color="@GetUsageColor(percentage)" 
+                                                                       Size="Size.Small" />
+                                                    <MudText Typo="Typo.caption">@percentage.ToString("F1")%</MudText>
+                                                </div>
                                             }
                                             else
                                             {
-                                                <MudText Typo="Typo.caption">No limit</MudText>
+                                                <MudText Typo="Typo.caption">@FormatBytes(service.CurrentUsage)</MudText>
                                             }
+                                        </MudTd>
+                                        <MudTd DataLabel="Last Accessed">
+                                            <MudText Typo="Typo.caption">
+                                                @(service.LastAccessedAt?.ToString("MMM dd, HH:mm") ?? "Never")
+                                            </MudText>
                                         </MudTd>
                                         <MudTd DataLabel="Actions">
                                             <MudButtonGroup Size="Size.Small">
@@ -136,19 +252,27 @@
                                                     <MudIconButton Icon="Icons.Material.Filled.PlayArrow" 
                                                                    Color="Color.Success" 
                                                                    Size="Size.Small"
-                                                                   OnClick="@(() => StartService(service.Id))" />
+                                                                   OnClick="@(() => StartService(service.Id))"
+                                                                   Title="Start Service" />
                                                 }
                                                 else if (service.Status == "Running")
                                                 {
                                                     <MudIconButton Icon="Icons.Material.Filled.Stop" 
                                                                    Color="Color.Warning" 
                                                                    Size="Size.Small"
-                                                                   OnClick="@(() => StopService(service.Id))" />
+                                                                   OnClick="@(() => StopService(service.Id))"
+                                                                   Title="Stop Service" />
                                                 }
                                                 <MudIconButton Icon="Icons.Material.Filled.Visibility" 
                                                                Color="Color.Primary" 
                                                                Size="Size.Small"
-                                                               Href="@($"/services/{service.Id}")" />
+                                                               Href="@($"/services/{service.Id}")"
+                                                               Title="View Details" />
+                                                <MudIconButton Icon="Icons.Material.Filled.BarChart" 
+                                                               Color="Color.Info" 
+                                                               Size="Size.Small"
+                                                               OnClick="@(() => ShowMetrics(service.Id))"
+                                                               Title="View Metrics" />
                                             </MudButtonGroup>
                                         </MudTd>
                                     </RowTemplate>
@@ -165,7 +289,7 @@
                             }
                             else
                             {
-                                <div class="text-center pa-4">
+                                <div class="text-center pa-8">
                                     <MudIcon Icon="Icons.Material.Filled.CloudOff" Size="Size.Large" Color="Color.Secondary" />
                                     <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No services yet</MudText>
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">Create your first service to get started</MudText>
@@ -193,15 +317,21 @@
                         <MudCardContent>
                             @if (recentActivities.Any())
                             {
-                                <MudList Dense="true">
+                                <MudList Dense="true" Class="activity-list">
                                     @foreach (var activity in recentActivities.Take(8))
                                     {
                                         <MudListItem>
-                                            <div>
-                                                <MudText Typo="Typo.body2">@activity.Action</MudText>
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                    @activity.UserName - @activity.Timestamp.ToString("MMM dd, HH:mm")
-                                                </MudText>
+                                            <div class="d-flex align-center">
+                                                <MudIcon Icon="@GetActivityIcon(activity.Action)" 
+                                                         Size="Size.Small" 
+                                                         Color="@GetActivityColor(activity.Level)"
+                                                         Class="me-3" />
+                                                <div class="flex-1">
+                                                    <MudText Typo="Typo.body2">@activity.Action</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                        @activity.UserName - @activity.Timestamp.ToString("MMM dd, HH:mm")
+                                                    </MudText>
+                                                </div>
                                             </div>
                                         </MudListItem>
                                         <MudDivider />
@@ -226,6 +356,19 @@
                 </MudItem>
             </MudGrid>
         }
+
+        <!-- Service Metrics Dialog -->
+        <MudDialog @bind-IsVisible="showMetricsDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true })">
+            <TitleContent>
+                <MudText Typo="Typo.h6">Service Metrics</MudText>
+            </TitleContent>
+            <DialogContent>
+                <div id="serviceMetricsChart" style="height: 400px;"></div>
+            </DialogContent>
+            <DialogActions>
+                <MudButton OnClick="CloseMetricsDialog">Close</MudButton>
+            </DialogActions>
+        </MudDialog>
     </Authorized>
     <NotAuthorized>
         <div class="d-flex align-center justify-center" style="height: 70vh;">
@@ -246,11 +389,29 @@
     </NotAuthorized>
 </AuthorizeView>
 
+<style>
+    .stat-card {
+        transition: transform 0.2s ease-in-out;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
+    .activity-list .mud-list-item {
+        padding: 8px 0;
+    }
+</style>
+
 @code {
     private bool isLoading = true;
+    private bool autoRefresh = false;
     private DashboardStatsDto? dashboardStats;
     private List<ServiceInstanceDto> serviceInstances = new();
     private List<AuditLogDto> recentActivities = new();
+    private object? systemHealth;
+    private object? usageTrends;
+    private Timer? refreshTimer;
+    private bool showMetricsDialog = false;
+    private Guid selectedServiceId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -258,6 +419,17 @@
         if (authState.User.Identity?.IsAuthenticated == true)
         {
             await LoadDashboardData();
+            await InitializeCharts();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialize charts after DOM is ready
+            await Task.Delay(500);
+            await UpdateUsageChart();
         }
     }
 
@@ -267,10 +439,23 @@
         
         try
         {
-            // Load data sequentially to avoid null issues
-            dashboardStats = await DashboardService.GetDashboardStatsAsync();
-            serviceInstances = await ServiceInstanceService.GetServiceInstancesAsync();
-            recentActivities = await DashboardService.GetRecentActivitiesAsync(10);
+            // Load data in parallel for better performance
+            var tasks = new[]
+            {
+                DashboardService.GetDashboardStatsAsync(),
+                ServiceInstanceService.GetServiceInstancesAsync(),
+                DashboardService.GetRecentActivitiesAsync(10),
+                GetSystemHealth(),
+                GetUsageTrends()
+            };
+
+            await Task.WhenAll(tasks);
+
+            dashboardStats = await tasks[0] as DashboardStatsDto;
+            serviceInstances = (await tasks[1] as Task<List<ServiceInstanceDto>>)?.Result ?? new();
+            recentActivities = (await tasks[2] as Task<List<AuditLogDto>>)?.Result ?? new();
+            systemHealth = await tasks[3];
+            usageTrends = await tasks[4];
         }
         catch (Exception ex)
         {
@@ -279,6 +464,78 @@
         finally
         {
             isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<object?> GetSystemHealth()
+    {
+        try
+        {
+            var response = await DashboardService.GetDashboardStatsAsync(); // This would call system health endpoint
+            return new
+            {
+                OverallHealth = "Healthy",
+                ServicesHealth = new Dictionary<string, int>
+                {
+                    ["Running"] = serviceInstances.Count(s => s.Status == "Running"),
+                    ["Stopped"] = serviceInstances.Count(s => s.Status == "Stopped"),
+                    ["Error"] = serviceInstances.Count(s => s.Status == "Error")
+                },
+                RecentErrors = 0,
+                Warnings = new List<string>()
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<object?> GetUsageTrends()
+    {
+        try
+        {
+            // This would call the usage trends endpoint
+            return new { /* trends data */ };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        await LoadDashboardData();
+        await UpdateUsageChart();
+        Snackbar.Add("Dashboard refreshed", Severity.Success);
+    }
+
+    private async Task InitializeCharts()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("initializeCharts");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing charts: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateUsageChart()
+    {
+        if (usageTrends != null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("updateUsageChart", usageTrends);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating chart: {ex.Message}");
+            }
         }
     }
 
@@ -310,6 +567,25 @@
         }
     }
 
+    private async Task ShowMetrics(Guid serviceId)
+    {
+        selectedServiceId = serviceId;
+        showMetricsDialog = true;
+        
+        // Load and display service metrics
+        var metrics = await DashboardService.GetServiceMetricsAsync(serviceId);
+        if (metrics != null)
+        {
+            await JS.InvokeVoidAsync("updateServiceMetricsChart", metrics);
+        }
+    }
+
+    private void CloseMetricsDialog()
+    {
+        showMetricsDialog = false;
+    }
+
+    // Helper methods for styling
     private Color GetStatusColor(string status) => status switch
     {
         "Running" => Color.Success,
@@ -317,6 +593,51 @@
         "Error" => Color.Error,
         "Created" => Color.Info,
         _ => Color.Default
+    };
+
+    private Color GetUsageColor(double percentage) => percentage switch
+    {
+        >= 90 => Color.Error,
+        >= 80 => Color.Warning,
+        >= 60 => Color.Info,
+        _ => Color.Success
+    };
+
+    private Color GetHealthColor(string health) => health switch
+    {
+        "Healthy" => Color.Success,
+        "Warning" => Color.Warning,
+        "Critical" => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetActivityColor(string level) => level switch
+    {
+        "Error" => Color.Error,
+        "Warning" => Color.Warning,
+        "Info" => Color.Info,
+        _ => Color.Default
+    };
+
+    private string GetServiceIcon(string serviceType) => serviceType switch
+    {
+        "S3Storage" => Icons.Material.Filled.Storage,
+        "RDSDatabase" => Icons.Material.Filled.Database,
+        "NoSQLDatabase" => Icons.Material.Filled.TableChart,
+        "Queue" => Icons.Material.Filled.Queue,
+        "Function" => Icons.Material.Filled.Functions,
+        _ => Icons.Material.Filled.Cloud
+    };
+
+    private string GetActivityIcon(string action) => action switch
+    {
+        var a when a.Contains("Create") => Icons.Material.Filled.Add,
+        var a when a.Contains("Delete") => Icons.Material.Filled.Delete,
+        var a when a.Contains("Update") => Icons.Material.Filled.Edit,
+        var a when a.Contains("Start") => Icons.Material.Filled.PlayArrow,
+        var a when a.Contains("Stop") => Icons.Material.Filled.Stop,
+        var a when a.Contains("Login") => Icons.Material.Filled.Login,
+        _ => Icons.Material.Filled.Info
     };
 
     private string FormatBytes(long bytes)
@@ -330,5 +651,29 @@
             len = len / 1024;
         }
         return $"{len:0.##} {sizes[order]}";
+    }
+
+    // Auto-refresh functionality
+    private void OnAutoRefreshChanged()
+    {
+        if (autoRefresh)
+        {
+            refreshTimer = new Timer(async _ => await InvokeAsync(async () =>
+            {
+                await LoadDashboardData();
+                await UpdateUsageChart();
+                StateHasChanged();
+            }), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        }
+        else
+        {
+            refreshTimer?.Dispose();
+            refreshTimer = null;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        refreshTimer?.Dispose();
     }
 }

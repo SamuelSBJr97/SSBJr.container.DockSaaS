@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SSBJr.container.DockSaaS.ApiService.Data;
 using SSBJr.container.DockSaaS.ApiService.DTOs;
+using System.Security.Claims;
 
 namespace SSBJr.container.DockSaaS.ApiService.Controllers;
 
@@ -22,8 +23,22 @@ public class DashboardController : ControllerBase
 
     private Guid GetCurrentTenantId()
     {
-        var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
-        return Guid.Parse(tenantIdClaim ?? throw new UnauthorizedAccessException("Tenant ID not found"));
+        var tenantIdClaim = User.FindFirst("tenant_id")?.Value ?? User.FindFirst("TenantId")?.Value;
+        if (string.IsNullOrEmpty(tenantIdClaim))
+        {
+            // Try to get from user entity
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(userId))
+            {
+                var user = _context.Users.FirstOrDefault(u => u.Id == Guid.Parse(userId));
+                if (user != null)
+                {
+                    return user.TenantId;
+                }
+            }
+            throw new UnauthorizedAccessException("Tenant ID not found");
+        }
+        return Guid.Parse(tenantIdClaim);
     }
 
     [HttpGet("stats")]
@@ -47,10 +62,14 @@ public class DashboardController : ControllerBase
                 .Where(si => si.TenantId == tenantId && si.ServiceDefinition!.Type == "S3Storage")
                 .SumAsync(si => si.CurrentUsage);
 
-            // Calculate API calls (simulated based on service instances)
-            var totalApiCalls = await _context.ServiceInstances
-                .Where(si => si.TenantId == tenantId)
-                .SumAsync(si => (int)(si.CurrentUsage / 1000)); // Simplified calculation
+            // Use tenant current API calls or calculate from service instances
+            var totalApiCalls = tenant.CurrentApiCalls;
+            if (totalApiCalls == 0)
+            {
+                totalApiCalls = await _context.ServiceInstances
+                    .Where(si => si.TenantId == tenantId)
+                    .SumAsync(si => (int)(si.CurrentUsage / 1000)); // Simplified calculation
+            }
 
             // Calculate usage percentages
             var storageUsagePercent = tenant.StorageLimit > 0 ? (double)totalStorage / tenant.StorageLimit * 100 : 0;
@@ -238,6 +257,8 @@ public class DashboardController : ControllerBase
                     tenant.UserLimit,
                     tenant.StorageLimit,
                     tenant.ApiCallsLimit,
+                    tenant.CurrentStorage,
+                    tenant.CurrentApiCalls,
                     tenant.CreatedAt
                 },
                 Services = servicesSummary.GroupBy(s => s.ServiceType)
@@ -265,6 +286,112 @@ public class DashboardController : ControllerBase
         {
             _logger.LogError(ex, "Failed to get tenant overview");
             return StatusCode(500, "Failed to get tenant overview");
+        }
+    }
+
+    [HttpGet("system-health")]
+    public async Task<ActionResult<object>> GetSystemHealth()
+    {
+        try
+        {
+            var tenantId = GetCurrentTenantId();
+
+            // Check service instances health
+            var servicesHealth = await _context.ServiceInstances
+                .Where(si => si.TenantId == tenantId)
+                .GroupBy(si => si.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            // Check for failed metrics in the last hour
+            var oneHourAgo = DateTime.UtcNow.AddHours(-1);
+            var recentErrors = await _context.AuditLogs
+                .Where(al => al.TenantId == tenantId && 
+                           al.Timestamp >= oneHourAgo && 
+                           al.Level == "Error")
+                .CountAsync();
+
+            // Check tenant limits
+            var tenant = await _context.Tenants.FindAsync(tenantId);
+            var warnings = new List<string>();
+
+            if (tenant != null)
+            {
+                var storagePercent = tenant.StorageLimit > 0 ? (double)tenant.CurrentStorage / tenant.StorageLimit * 100 : 0;
+                var apiCallsPercent = tenant.ApiCallsLimit > 0 ? (double)tenant.CurrentApiCalls / tenant.ApiCallsLimit * 100 : 0;
+
+                if (storagePercent > 80) warnings.Add($"Storage usage is at {storagePercent:F1}%");
+                if (apiCallsPercent > 80) warnings.Add($"API calls usage is at {apiCallsPercent:F1}%");
+            }
+
+            var overallHealth = recentErrors == 0 && warnings.Count == 0 ? "Healthy" : 
+                               warnings.Count > 0 ? "Warning" : "Critical";
+
+            return Ok(new
+            {
+                OverallHealth = overallHealth,
+                ServicesHealth = servicesHealth.ToDictionary(s => s.Status, s => s.Count),
+                RecentErrors = recentErrors,
+                Warnings = warnings,
+                CheckedAt = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get system health");
+            return StatusCode(500, "Failed to get system health");
+        }
+    }
+
+    [HttpGet("usage-trends")]
+    public async Task<ActionResult<object>> GetUsageTrends([FromQuery] int days = 7)
+    {
+        try
+        {
+            var tenantId = GetCurrentTenantId();
+            var fromDate = DateTime.UtcNow.AddDays(-days);
+
+            // Get daily usage trends
+            var usageRecords = await _context.UsageRecords
+                .Where(ur => ur.TenantId == tenantId && ur.Timestamp >= fromDate)
+                .GroupBy(ur => new { 
+                    Date = ur.Timestamp.Date, 
+                    ur.MetricType 
+                })
+                .Select(g => new
+                {
+                    Date = g.Key.Date,
+                    MetricType = g.Key.MetricType,
+                    TotalValue = g.Sum(ur => ur.Value),
+                    Count = g.Count()
+                })
+                .OrderBy(x => x.Date)
+                .ToListAsync();
+
+            var trendData = usageRecords
+                .GroupBy(ur => ur.MetricType)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(ur => new
+                    {
+                        ur.Date,
+                        ur.TotalValue,
+                        ur.Count
+                    }).ToList()
+                );
+
+            return Ok(new
+            {
+                TenantId = tenantId,
+                TimeRange = $"Last {days} days",
+                Trends = trendData,
+                GeneratedAt = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get usage trends");
+            return StatusCode(500, "Failed to get usage trends");
         }
     }
 }
