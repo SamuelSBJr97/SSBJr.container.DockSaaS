@@ -70,15 +70,16 @@ Se não conseguir fazer login, tente:
 7. **Se ver erro "JSON deserialization error" para health endpoint, isso foi corrigido - atualize o código**
 8. **Execute o script de troubleshooting: `.\scripts\troubleshoot-login.ps1`**
 
-**⚠️ Troubleshooting do Dashboard:**
-Se encontrar erros no dashboard (blazored-localstorage.js 404, message port closed, JavaScript interop errors):
-1. **Estes erros são geralmente inofensivos e não afetam a funcionalidade** - são relacionados ao prerendering do Blazor Server
-2. Execute o script de diagnóstico: `.\scripts\fix-dashboard.ps1`
-3. Limpe o cache do navegador (Ctrl+F5)
-4. Tente navegação privada/incógnita
-5. Desative extensões do navegador temporariamente
-6. Verifique se as portas estão corretas (Web: 7001, API: 7000)
-7. **Se vir "JavaScript interop calls cannot be issued at this time" nos logs, isso é normal durante o prerendering**
+**⚠️ Troubleshooting do Dashboard (após login):**
+Se fizer login mas o dashboard não carregar ou não mostrar dados:
+1. **Verifique se está redirecionando**: Após login deve ir para `https://localhost:7001/`
+2. **Verifique autenticação**: Navegador deve mostrar conteúdo do dashboard, não "Sign In"
+3. **Execute o teste específico**: `.\scripts\test-dashboard-login.ps1`
+4. **Verifique o console do navegador** (F12) por erros JavaScript
+5. **Limpe localStorage**: F12 → Application → Storage → Local Storage → Clear All
+6. **Teste em modo privado/incógnito** para descartar problemas de cache
+7. **Verifique logs da aplicação** no Visual Studio ou terminal do Aspire
+8. **Aguarde carregamento**: Dashboard pode demorar alguns segundos para carregar dados
 
 **⚠️ Troubleshooting de JSON:**
 Se encontrar erros de JSON deserialization:
@@ -397,6 +398,7 @@ dotnet test SSBJr.DockSaaS.Tests
 - `scripts/troubleshoot-login.ps1`: Diagnóstico de problemas
 - `scripts/test-api-health.ps1`: Teste de conectividade da API
 - `scripts/test-kafka-integration.ps1`: Teste de integração Kafka
+- `scripts/test-dashboard-login.ps1`: Teste específico do login do dashboard
 
 ## 🔧 Requisitos Técnicos
 
@@ -474,6 +476,9 @@ dotnet test SSBJr.DockSaaS.Tests
 
 # Teste de integração Kafka
 .\scripts\test-kafka-integration.ps1
+
+# Teste específico do dashboard
+.\scripts\test-dashboard-login.ps1
 ```
 
 ### Postman Testing

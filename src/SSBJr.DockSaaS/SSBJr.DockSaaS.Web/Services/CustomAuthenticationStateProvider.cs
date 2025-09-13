@@ -11,12 +11,14 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
     private readonly ILocalStorageService _localStorage;
     private readonly ILogger<CustomAuthenticationStateProvider> _logger;
     private readonly IJSRuntime _jsRuntime;
+    private AuthenticationState _currentAuthState;
 
     public CustomAuthenticationStateProvider(ILocalStorageService localStorage, ILogger<CustomAuthenticationStateProvider> logger, IJSRuntime jsRuntime)
     {
         _localStorage = localStorage;
         _logger = logger;
         _jsRuntime = jsRuntime;
+        _currentAuthState = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
     }
 
     private async Task<bool> IsJavaScriptAvailableAsync()
@@ -42,11 +44,11 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
     {
         try
         {
-            // If JavaScript is not available (prerendering), return anonymous user
+            // If JavaScript is not available (prerendering), return cached state or anonymous user
             if (!await IsJavaScriptAvailableAsync())
             {
-                _logger.LogDebug("JavaScript not available (prerendering), returning anonymous user");
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                _logger.LogDebug("JavaScript not available (prerendering), returning cached authentication state");
+                return _currentAuthState;
             }
 
             var token = await _localStorage.GetItemAsync<string>("authToken");
@@ -55,7 +57,8 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
             if (string.IsNullOrEmpty(token) || user == null)
             {
                 _logger.LogDebug("No token or user found in localStorage, returning anonymous user");
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                _currentAuthState = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                return _currentAuthState;
             }
 
             var expiry = await _localStorage.GetItemAsync<DateTime>("tokenExpiry");
@@ -66,7 +69,9 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
                 await _localStorage.RemoveItemAsync("currentUser");
                 await _localStorage.RemoveItemAsync("tokenExpiry");
                 await _localStorage.RemoveItemAsync("refreshToken");
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                
+                _currentAuthState = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                return _currentAuthState;
             }
 
             var claims = new List<Claim>
@@ -86,17 +91,19 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
             var principal = new ClaimsPrincipal(identity);
 
             _logger.LogDebug("User {Email} authenticated successfully with {RoleCount} roles", user.Email, user.Roles.Count);
-            return new AuthenticationState(principal);
+            _currentAuthState = new AuthenticationState(principal);
+            return _currentAuthState;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("JavaScript interop"))
         {
-            _logger.LogDebug("JavaScript interop not available (prerendering), returning anonymous user");
-            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            _logger.LogDebug("JavaScript interop not available (prerendering), returning cached authentication state");
+            return _currentAuthState;
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Error getting authentication state, returning anonymous user");
-            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            _currentAuthState = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            return _currentAuthState;
         }
     }
 
@@ -120,8 +127,10 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
             var identity = new ClaimsIdentity(claims, "jwt");
             var principal = new ClaimsPrincipal(identity);
 
-            _logger.LogDebug("Marking user {Email} as authenticated", user.Email);
-            NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
+            _currentAuthState = new AuthenticationState(principal);
+            
+            _logger.LogInformation("Marking user {Email} as authenticated and notifying state change", user.Email);
+            NotifyAuthenticationStateChanged(Task.FromResult(_currentAuthState));
         }
         catch (Exception ex)
         {
@@ -136,12 +145,32 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
             var identity = new ClaimsIdentity();
             var principal = new ClaimsPrincipal(identity);
 
-            _logger.LogDebug("Marking user as logged out");
-            NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
+            _currentAuthState = new AuthenticationState(principal);
+            
+            _logger.LogInformation("Marking user as logged out and notifying state change");
+            NotifyAuthenticationStateChanged(Task.FromResult(_currentAuthState));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error marking user as logged out");
+        }
+    }
+
+    /// <summary>
+    /// Force refresh of authentication state from storage
+    /// </summary>
+    public async Task RefreshAuthenticationStateAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Refreshing authentication state");
+            var newState = await GetAuthenticationStateAsync();
+            _currentAuthState = newState;
+            NotifyAuthenticationStateChanged(Task.FromResult(newState));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing authentication state");
         }
     }
 }

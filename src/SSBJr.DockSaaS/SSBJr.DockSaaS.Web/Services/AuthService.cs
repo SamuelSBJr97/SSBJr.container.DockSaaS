@@ -1,6 +1,7 @@
-using SSBJr.DockSaaS.Web.Models;
 using Blazored.LocalStorage;
-using Microsoft.JSInterop;
+using Microsoft.AspNetCore.Components.Authorization;
+using SSBJr.DockSaaS.Web.Models;
+using System.Text.Json;
 
 namespace SSBJr.DockSaaS.Web.Services;
 
@@ -8,96 +9,65 @@ public interface IAuthService
 {
     Task<bool> LoginAsync(LoginRequest request);
     Task<bool> RegisterAsync(RegisterRequest request);
-    Task<bool> LogoutAsync();
+    Task LogoutAsync();
     Task<UserDto?> GetCurrentUserAsync();
     Task<bool> IsAuthenticatedAsync();
+    Task<bool> RefreshTokenAsync();
 }
 
 public class AuthService : IAuthService
 {
     private readonly ApiClient _apiClient;
     private readonly ILocalStorageService _localStorage;
+    private readonly AuthenticationStateProvider _authStateProvider;
     private readonly ILogger<AuthService> _logger;
-    private readonly IJSRuntime _jsRuntime;
 
-    public AuthService(ApiClient apiClient, ILocalStorageService localStorage, ILogger<AuthService> logger, IJSRuntime jsRuntime)
+    public AuthService(
+        ApiClient apiClient,
+        ILocalStorageService localStorage,
+        AuthenticationStateProvider authStateProvider,
+        ILogger<AuthService> logger)
     {
         _apiClient = apiClient;
         _localStorage = localStorage;
+        _authStateProvider = authStateProvider;
         _logger = logger;
-        _jsRuntime = jsRuntime;
-    }
-
-    private async Task<bool> IsJavaScriptAvailableAsync()
-    {
-        try
-        {
-            // Check if JavaScript is available (not during prerendering)
-            await _jsRuntime.InvokeVoidAsync("eval", "void(0)");
-            return true;
-        }
-        catch (InvalidOperationException)
-        {
-            // JavaScript interop is not available during prerendering
-            return false;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
     }
 
     public async Task<bool> LoginAsync(LoginRequest request)
     {
         try
         {
-            _logger.LogInformation("Attempting login for user {Email} with tenant {TenantName}", 
-                request.Email, request.TenantName ?? "default");
-            
-            // Only try to access localStorage if JavaScript is available
-            if (await IsJavaScriptAvailableAsync())
-            {
-                // Clear any existing tokens before login
-                await _localStorage.RemoveItemAsync("authToken");
-                await _localStorage.RemoveItemAsync("refreshToken");
-                await _localStorage.RemoveItemAsync("tokenExpiry");
-                await _localStorage.RemoveItemAsync("currentUser");
-            }
-            
+            _logger.LogInformation("Attempting login for user: {Email}", request.Email);
+
             var response = await _apiClient.PostAsync<LoginRequest, LoginResponse>("api/auth/login", request);
             
-            if (response != null)
+            if (response != null && !string.IsNullOrEmpty(response.Token))
             {
-                _logger.LogInformation("Login successful for user {Email}. Token expires at {ExpiresAt}", 
-                    request.Email, response.ExpiresAt);
+                _logger.LogInformation("Login successful for user: {Email}", request.Email);
                 
-                // Only store in localStorage if JavaScript is available
-                if (await IsJavaScriptAvailableAsync())
-                {
-                    await _localStorage.SetItemAsync("authToken", response.Token);
-                    await _localStorage.SetItemAsync("refreshToken", response.RefreshToken);
-                    await _localStorage.SetItemAsync("tokenExpiry", response.ExpiresAt);
-                    await _localStorage.SetItemAsync("currentUser", response.User);
-                    
-                    _logger.LogDebug("User data stored in local storage for {Email}. User ID: {UserId}, Tenant: {TenantName}", 
-                        request.Email, response.User.Id, response.User.TenantName);
-                }
-                else
-                {
-                    // Set the authorization token directly on the API client
-                    _apiClient.SetAuthorizationToken(response.Token);
-                    _logger.LogDebug("Authorization token set directly on API client (prerendering mode)");
-                }
-                
+                // Store authentication data
+                await _localStorage.SetItemAsync("authToken", response.Token);
+                await _localStorage.SetItemAsync("refreshToken", response.RefreshToken);
+                await _localStorage.SetItemAsync("tokenExpiry", response.ExpiresAt);
+                await _localStorage.SetItemAsync("currentUser", response.User);
+
+                // Update API client with new token
+                _apiClient.SetAuthorizationToken(response.Token);
+
+                _logger.LogInformation("Authentication data stored successfully for user: {Email}", request.Email);
                 return true;
             }
-            
-            _logger.LogWarning("Login failed for user {Email} - API returned null response", request.Email);
-            return false;
+            else
+            {
+                _logger.LogWarning("Login failed for user: {Email}. Response: {Response}", 
+                    request.Email, JsonSerializer.Serialize(response));
+                return false;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Login failed for user {Email} with exception: {Message}", request.Email, ex.Message);
+            _logger.LogError(ex, "Login error for user: {Email}", request.Email);
             return false;
         }
     }
@@ -106,116 +76,77 @@ public class AuthService : IAuthService
     {
         try
         {
-            _logger.LogInformation("Attempting registration for user {Email} with tenant {TenantName}", 
-                request.Email, request.TenantName);
-            
-            // Only try to access localStorage if JavaScript is available
-            if (await IsJavaScriptAvailableAsync())
-            {
-                // Clear any existing tokens before registration
-                await _localStorage.RemoveItemAsync("authToken");
-                await _localStorage.RemoveItemAsync("refreshToken");
-                await _localStorage.RemoveItemAsync("tokenExpiry");
-                await _localStorage.RemoveItemAsync("currentUser");
-            }
-            
+            _logger.LogInformation("Attempting registration for user: {Email}", request.Email);
+
             var response = await _apiClient.PostAsync<RegisterRequest, LoginResponse>("api/auth/register", request);
             
-            if (response != null)
+            if (response != null && !string.IsNullOrEmpty(response.Token))
             {
-                _logger.LogInformation("Registration successful for user {Email}. Token expires at {ExpiresAt}", 
-                    request.Email, response.ExpiresAt);
+                _logger.LogInformation("Registration successful for user: {Email}", request.Email);
                 
-                // Only store in localStorage if JavaScript is available
-                if (await IsJavaScriptAvailableAsync())
-                {
-                    await _localStorage.SetItemAsync("authToken", response.Token);
-                    await _localStorage.SetItemAsync("refreshToken", response.RefreshToken);
-                    await _localStorage.SetItemAsync("tokenExpiry", response.ExpiresAt);
-                    await _localStorage.SetItemAsync("currentUser", response.User);
-                    
-                    _logger.LogDebug("User data stored in local storage for {Email}. User ID: {UserId}, Tenant: {TenantName}", 
-                        request.Email, response.User.Id, response.User.TenantName);
-                }
-                else
-                {
-                    // Set the authorization token directly on the API client
-                    _apiClient.SetAuthorizationToken(response.Token);
-                    _logger.LogDebug("Authorization token set directly on API client (prerendering mode)");
-                }
-                
+                // Store authentication data
+                await _localStorage.SetItemAsync("authToken", response.Token);
+                await _localStorage.SetItemAsync("refreshToken", response.RefreshToken);
+                await _localStorage.SetItemAsync("tokenExpiry", response.ExpiresAt);
+                await _localStorage.SetItemAsync("currentUser", response.User);
+
+                // Update API client with new token
+                _apiClient.SetAuthorizationToken(response.Token);
+
+                _logger.LogInformation("Authentication data stored successfully for new user: {Email}", request.Email);
                 return true;
             }
-            
-            _logger.LogWarning("Registration failed for user {Email} - API returned null response", request.Email);
-            return false;
+            else
+            {
+                _logger.LogWarning("Registration failed for user: {Email}. Response: {Response}", 
+                    request.Email, JsonSerializer.Serialize(response));
+                return false;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Registration failed for user {Email} with exception: {Message}", request.Email, ex.Message);
+            _logger.LogError(ex, "Registration error for user: {Email}", request.Email);
             return false;
         }
     }
 
-    public async Task<bool> LogoutAsync()
+    public async Task LogoutAsync()
     {
         try
         {
-            var userEmail = "unknown";
-            
-            // Only try to access localStorage if JavaScript is available
-            if (await IsJavaScriptAvailableAsync())
-            {
-                try
-                {
-                    var currentUser = await _localStorage.GetItemAsync<UserDto>("currentUser");
-                    userEmail = currentUser?.Email ?? "unknown";
-                }
-                catch { }
+            _logger.LogInformation("Logging out current user");
 
-                _logger.LogInformation("Attempting logout for user {Email}", userEmail);
-
-                // Clear local storage
-                await _localStorage.RemoveItemAsync("authToken");
-                await _localStorage.RemoveItemAsync("refreshToken");
-                await _localStorage.RemoveItemAsync("tokenExpiry");
-                await _localStorage.RemoveItemAsync("currentUser");
-                
-                _logger.LogDebug("Local storage cleared for user {Email}", userEmail);
-            }
-            else
-            {
-                _logger.LogInformation("Attempting logout (prerendering mode)");
-            }
-
-            // Clear authorization header
-            _apiClient.SetAuthorizationToken(null);
-
-            // Try to call the API logout (don't fail if this doesn't work)
+            // Call logout endpoint if available
             try
             {
-                var apiResult = await _apiClient.PostAsync("api/auth/logout");
-                if (apiResult)
-                {
-                    _logger.LogDebug("API logout call succeeded for user {Email}", userEmail);
-                }
-                else
-                {
-                    _logger.LogWarning("API logout call failed for user {Email}", userEmail);
-                }
+                await _apiClient.PostAsync("api/auth/logout");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "API logout call failed for user {Email}, but local data cleared", userEmail);
+                _logger.LogWarning(ex, "Error calling logout endpoint (non-critical)");
             }
-            
-            _logger.LogInformation("User {Email} logged out successfully", userEmail);
-            return true;
+
+            // Clear local storage
+            await _localStorage.RemoveItemAsync("authToken");
+            await _localStorage.RemoveItemAsync("refreshToken");
+            await _localStorage.RemoveItemAsync("tokenExpiry");
+            await _localStorage.RemoveItemAsync("currentUser");
+
+            // Clear API client token
+            _apiClient.SetAuthorizationToken(null);
+
+            // Update authentication state
+            if (_authStateProvider is CustomAuthenticationStateProvider customProvider)
+            {
+                customProvider.MarkUserAsLoggedOut();
+            }
+
+            _logger.LogInformation("User logged out successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Logout failed");
-            return false;
+            _logger.LogError(ex, "Error during logout");
+            throw;
         }
     }
 
@@ -223,45 +154,19 @@ public class AuthService : IAuthService
     {
         try
         {
-            // Only try to access localStorage if JavaScript is available
-            if (await IsJavaScriptAvailableAsync())
-            {
-                // Try to get from local storage first
-                var cachedUser = await _localStorage.GetItemAsync<UserDto>("currentUser");
-                if (cachedUser != null)
-                {
-                    _logger.LogDebug("Retrieved cached user {Email} from local storage", cachedUser.Email);
-                    return cachedUser;
-                }
-            }
-
-            _logger.LogDebug("No cached user found, attempting to get from API");
-
-            // If not in cache, try to get from API
-            var user = await _apiClient.GetAsync<UserDto>("api/auth/me");
+            var user = await _localStorage.GetItemAsync<UserDto>("currentUser");
             if (user != null)
             {
-                // Only cache if JavaScript is available
-                if (await IsJavaScriptAvailableAsync())
-                {
-                    await _localStorage.SetItemAsync("currentUser", user);
-                    _logger.LogDebug("Retrieved user {Email} from API and cached", user.Email);
-                }
-                else
-                {
-                    _logger.LogDebug("Retrieved user {Email} from API (no caching in prerendering mode)", user.Email);
-                }
+                _logger.LogDebug("Retrieved current user from localStorage: {Email}", user.Email);
+                return user;
             }
-            else
-            {
-                _logger.LogDebug("No user returned from API");
-            }
-            
-            return user;
+
+            _logger.LogDebug("No current user found in localStorage");
+            return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get current user");
+            _logger.LogError(ex, "Error getting current user");
             return null;
         }
     }
@@ -270,39 +175,80 @@ public class AuthService : IAuthService
     {
         try
         {
-            // Only try to access localStorage if JavaScript is available
-            if (!await IsJavaScriptAvailableAsync())
-            {
-                _logger.LogDebug("JavaScript not available (prerendering), assuming not authenticated");
-                return false;
-            }
-
             var token = await _localStorage.GetItemAsync<string>("authToken");
+            var expiry = await _localStorage.GetItemAsync<DateTime>("tokenExpiry");
+
             if (string.IsNullOrEmpty(token))
             {
-                _logger.LogDebug("No auth token found in local storage");
+                _logger.LogDebug("No authentication token found");
                 return false;
             }
 
-            var expiry = await _localStorage.GetItemAsync<DateTime>("tokenExpiry");
             if (expiry != default && expiry <= DateTime.UtcNow)
             {
-                _logger.LogDebug("Auth token has expired (expired at {ExpiryTime}), logging out", expiry);
-                await LogoutAsync();
+                _logger.LogDebug("Authentication token expired");
+                await LogoutAsync(); // Clear expired token
                 return false;
             }
 
-            _logger.LogDebug("Auth token is valid and not expired (expires at {ExpiryTime})", expiry);
+            _logger.LogDebug("User is authenticated with valid token");
             return true;
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("JavaScript interop"))
-        {
-            _logger.LogDebug("JavaScript interop not available (prerendering), assuming not authenticated");
-            return false;
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to check authentication status, assuming not authenticated");
+            _logger.LogError(ex, "Error checking authentication status");
+            return false;
+        }
+    }
+
+    public async Task<bool> RefreshTokenAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Attempting to refresh authentication token");
+
+            var refreshToken = await _localStorage.GetItemAsync<string>("refreshToken");
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                _logger.LogWarning("No refresh token available");
+                return false;
+            }
+
+            var request = new { RefreshToken = refreshToken };
+            var response = await _apiClient.PostAsync<object, LoginResponse>("api/auth/refresh", request);
+            
+            if (response != null && !string.IsNullOrEmpty(response.Token))
+            {
+                _logger.LogInformation("Token refresh successful");
+                
+                // Update stored authentication data
+                await _localStorage.SetItemAsync("authToken", response.Token);
+                await _localStorage.SetItemAsync("refreshToken", response.RefreshToken);
+                await _localStorage.SetItemAsync("tokenExpiry", response.ExpiresAt);
+                await _localStorage.SetItemAsync("currentUser", response.User);
+
+                // Update API client with new token
+                _apiClient.SetAuthorizationToken(response.Token);
+
+                // Refresh authentication state
+                if (_authStateProvider is CustomAuthenticationStateProvider customProvider)
+                {
+                    await customProvider.RefreshAuthenticationStateAsync();
+                }
+
+                return true;
+            }
+            else
+            {
+                _logger.LogWarning("Token refresh failed: {Response}", JsonSerializer.Serialize(response));
+                await LogoutAsync(); // Clear invalid tokens
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing token");
+            await LogoutAsync(); // Clear potentially invalid tokens
             return false;
         }
     }

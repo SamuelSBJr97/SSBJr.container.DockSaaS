@@ -151,6 +151,15 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Check if user is already logged in
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            Logger.LogInformation("User already authenticated, redirecting to dashboard");
+            Navigation.NavigateTo("/", true);
+            return;
+        }
+
         await TestApiConnection();
     }
 
@@ -212,17 +221,23 @@
                 if (result)
                 {
                     Snackbar.Add("Account created successfully! Welcome to DockSaaS.", Severity.Success);
+                    Logger.LogInformation("Registration successful for user {Email}", registerRequest.Email);
                     
-                    // Notify the authentication state provider about the new user
-                    if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
+                    // Wait a moment for the auth state to be processed
+                    await Task.Delay(500);
+                    
+                    // Get current user and notify authentication provider
+                    var user = await AuthService.GetCurrentUserAsync();
+                    if (user != null && AuthStateProvider is CustomAuthenticationStateProvider customProvider)
                     {
-                        var user = await AuthService.GetCurrentUserAsync();
-                        if (user != null)
-                        {
-                            customProvider.MarkUserAsAuthenticated(user);
-                        }
+                        customProvider.MarkUserAsAuthenticated(user);
+                        Logger.LogInformation("Authentication state updated for user {Email}", user.Email);
+                        
+                        // Wait for state change to propagate
+                        await Task.Delay(200);
                     }
                     
+                    // Navigate to dashboard
                     Navigation.NavigateTo("/", true);
                 }
                 else
@@ -237,17 +252,23 @@
                 if (result)
                 {
                     Snackbar.Add("Welcome back!", Severity.Success);
+                    Logger.LogInformation("Login successful for user {Email}", loginRequest.Email);
                     
-                    // Notify the authentication state provider about the login
-                    if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
+                    // Wait a moment for the auth state to be processed
+                    await Task.Delay(500);
+                    
+                    // Get current user and notify authentication provider
+                    var user = await AuthService.GetCurrentUserAsync();
+                    if (user != null && AuthStateProvider is CustomAuthenticationStateProvider customProvider)
                     {
-                        var user = await AuthService.GetCurrentUserAsync();
-                        if (user != null)
-                        {
-                            customProvider.MarkUserAsAuthenticated(user);
-                        }
+                        customProvider.MarkUserAsAuthenticated(user);
+                        Logger.LogInformation("Authentication state updated for user {Email}", user.Email);
+                        
+                        // Wait for state change to propagate
+                        await Task.Delay(200);
                     }
                     
+                    // Navigate to dashboard
                     Navigation.NavigateTo("/", true);
                 }
                 else

@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
+@inject ILogger<Home> Logger
 @implements IAsyncDisposable
 
 <PageTitle>Dashboard - DockSaaS</PageTitle>
@@ -329,6 +330,16 @@
                 </MudItem>
             </MudGrid>
         }
+        else if (!isLoading)
+        {
+            <!-- Fallback when data fails to load -->
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                Unable to load dashboard data. Please refresh the page or check your connection.
+                <MudButton OnClick="RefreshData" Variant="Variant.Text" Size="Size.Small" Class="ml-2">
+                    Retry
+                </MudButton>
+            </MudAlert>
+        }
 
         <!-- Service Metrics Dialog -->
         <MudDialog @bind-IsVisible="showMetricsDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true })">
@@ -386,11 +397,22 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Logger.LogInformation("Dashboard: OnInitializedAsync called");
+        
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        Logger.LogInformation("Dashboard: Authentication state - IsAuthenticated: {IsAuthenticated}", 
+            authState.User.Identity?.IsAuthenticated);
+            
         if (authState.User.Identity?.IsAuthenticated == true)
         {
+            Logger.LogInformation("Dashboard: User is authenticated, loading data");
             await LoadDashboardData();
             await InitializeCharts();
+        }
+        else
+        {
+            Logger.LogInformation("Dashboard: User is not authenticated");
+            isLoading = false;
         }
     }
 
@@ -398,6 +420,8 @@
     {
         if (firstRender)
         {
+            Logger.LogInformation("Dashboard: OnAfterRenderAsync (first render)");
+            
             // Initialize charts after DOM is ready
             await Task.Delay(500);
             await UpdateUsageChart();
@@ -407,27 +431,41 @@
     private async Task LoadDashboardData()
     {
         isLoading = true;
+        Logger.LogInformation("Dashboard: Loading dashboard data");
         
         try
         {
             // Load data sequentially for better error handling
             dashboardStats = await DashboardService.GetDashboardStatsAsync();
+            Logger.LogInformation("Dashboard: Stats loaded - TotalUsers: {TotalUsers}", dashboardStats?.TotalUsers ?? 0);
+            
             serviceInstances = await ServiceInstanceService.GetServiceInstancesAsync();
+            Logger.LogInformation("Dashboard: Service instances loaded - Count: {Count}", serviceInstances.Count);
+            
             recentActivities = await DashboardService.GetRecentActivitiesAsync(10);
+            Logger.LogInformation("Dashboard: Recent activities loaded - Count: {Count}", recentActivities.Count);
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Dashboard: Failed to load dashboard data");
             Snackbar.Add($"Failed to load dashboard data: {ex.Message}", Severity.Error);
+            
+            // Provide fallback data to prevent UI errors
+            dashboardStats ??= new DashboardStatsDto();
+            serviceInstances ??= new List<ServiceInstanceDto>();
+            recentActivities ??= new List<AuditLogDto>();
         }
         finally
         {
             isLoading = false;
             StateHasChanged();
+            Logger.LogInformation("Dashboard: Data loading completed, isLoading: {IsLoading}", isLoading);
         }
     }
 
     private async Task RefreshData()
     {
+        Logger.LogInformation("Dashboard: Manual refresh requested");
         await LoadDashboardData();
         await UpdateUsageChart();
         Snackbar.Add("Dashboard refreshed", Severity.Success);
@@ -438,10 +476,11 @@
         try
         {
             await JS.InvokeVoidAsync("initializeCharts");
+            Logger.LogInformation("Dashboard: Charts initialized successfully");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error initializing charts: {ex.Message}");
+            Logger.LogWarning(ex, "Dashboard: Error initializing charts (non-critical)");
         }
     }
 
@@ -452,15 +491,17 @@
             // Generate sample data for demonstration
             var sampleData = new { Trends = new { } };
             await JS.InvokeVoidAsync("updateUsageChart", sampleData);
+            Logger.LogDebug("Dashboard: Usage chart updated");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error updating chart: {ex.Message}");
+            Logger.LogWarning(ex, "Dashboard: Error updating chart (non-critical)");
         }
     }
 
     private async Task StartService(Guid serviceId)
     {
+        Logger.LogInformation("Dashboard: Starting service {ServiceId}", serviceId);
         var result = await ServiceInstanceService.StartServiceInstanceAsync(serviceId);
         if (result)
         {
@@ -475,6 +516,7 @@
 
     private async Task StopService(Guid serviceId)
     {
+        Logger.LogInformation("Dashboard: Stopping service {ServiceId}", serviceId);
         var result = await ServiceInstanceService.StopServiceInstanceAsync(serviceId);
         if (result)
         {
@@ -489,6 +531,7 @@
 
     private async Task ShowMetrics(Guid serviceId)
     {
+        Logger.LogInformation("Dashboard: Showing metrics for service {ServiceId}", serviceId);
         selectedServiceId = serviceId;
         showMetricsDialog = true;
         
@@ -509,6 +552,8 @@
     private async Task OnAutoRefreshChanged(ChangeEventArgs e)
     {
         autoRefresh = (bool)(e.Value ?? false);
+        Logger.LogInformation("Dashboard: Auto-refresh {Status}", autoRefresh ? "enabled" : "disabled");
+        
         if (autoRefresh)
         {
             refreshTimer = new Timer(async _ => await InvokeAsync(async () =>
@@ -558,6 +603,7 @@
         "NoSQLDatabase" => Icons.Material.Filled.TableChart,
         "Queue" => Icons.Material.Filled.Queue,
         "Function" => Icons.Material.Filled.Functions,
+        "Kafka" => Icons.Material.Filled.Dns,
         _ => Icons.Material.Filled.Cloud
     };
 
