@@ -115,10 +115,10 @@ public class KafkaServiceProvider : IServiceProvider
         return new ServiceProvisioningResult { Success = true };
     }
 
-    public async Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
+    public Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
     {
         var random = new Random();
-        return new ServiceStatus
+        return Task.FromResult(new ServiceStatus
         {
             Status = serviceInstance.Status,
             LastChecked = DateTime.UtcNow,
@@ -132,13 +132,13 @@ public class KafkaServiceProvider : IServiceProvider
                 { "diskUsagePercent", Math.Round(random.NextDouble() * 80, 2) },
                 { "networkThroughputMbps", Math.Round(random.NextDouble() * 1000, 2) }
             }
-        };
+        });
     }
 
-    public async Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
+    public Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
     {
         var random = new Random();
-        return new ServiceMetrics
+        return Task.FromResult(new ServiceMetrics
         {
             ServiceInstanceId = serviceInstance.Id,
             Timestamp = DateTime.UtcNow,
@@ -161,7 +161,7 @@ public class KafkaServiceProvider : IServiceProvider
                 ["disk_utilization"] = random.NextDouble() * 80,
                 ["jvm_heap_used_percent"] = random.NextDouble() * 90
             }
-        };
+        });
     }
 
     private async Task CreateKafkaClusterAsync(string clusterName, ServiceInstance serviceInstance)
@@ -243,21 +243,21 @@ public class S3StorageServiceProvider : IServiceProvider
         return new ServiceProvisioningResult { Success = true };
     }
 
-    public async Task<ServiceProvisioningResult> StartAsync(ServiceInstance serviceInstance)
+    public Task<ServiceProvisioningResult> StartAsync(ServiceInstance serviceInstance)
     {
         // S3 storage is always available, no start/stop concept
-        return new ServiceProvisioningResult { Success = true };
+        return Task.FromResult(new ServiceProvisioningResult { Success = true });
     }
 
-    public async Task<ServiceProvisioningResult> StopAsync(ServiceInstance serviceInstance)
+    public Task<ServiceProvisioningResult> StopAsync(ServiceInstance serviceInstance)
     {
         // S3 storage is always available, no start/stop concept
-        return new ServiceProvisioningResult { Success = true };
+        return Task.FromResult(new ServiceProvisioningResult { Success = true });
     }
 
-    public async Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
+    public Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
     {
-        return new ServiceStatus
+        return Task.FromResult(new ServiceStatus
         {
             Status = "Running",
             LastChecked = DateTime.UtcNow,
@@ -266,14 +266,14 @@ public class S3StorageServiceProvider : IServiceProvider
                 { "health", "healthy" },
                 { "uptime", "100%" }
             }
-        };
+        });
     }
 
-    public async Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
+    public Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
     {
         // Simulate metrics collection
         var random = new Random();
-        return new ServiceMetrics
+        return Task.FromResult(new ServiceMetrics
         {
             ServiceInstanceId = serviceInstance.Id,
             Timestamp = DateTime.UtcNow,
@@ -284,7 +284,7 @@ public class S3StorageServiceProvider : IServiceProvider
                 ["error_rate"] = random.NextDouble() * 0.05, // 0-5% error rate
                 ["response_time_ms"] = random.Next(50, 200)
             }
-        };
+        });
     }
 
     private async Task CreateStorageBucketAsync(string bucketName, ServiceInstance serviceInstance)
@@ -372,9 +372,9 @@ public class RDSDatabaseServiceProvider : IServiceProvider
         return new ServiceProvisioningResult { Success = true };
     }
 
-    public async Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
+    public Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
     {
-        return new ServiceStatus
+        return Task.FromResult(new ServiceStatus
         {
             Status = serviceInstance.Status,
             LastChecked = DateTime.UtcNow,
@@ -384,13 +384,13 @@ public class RDSDatabaseServiceProvider : IServiceProvider
                 { "cpu_utilization", Math.Round(new Random().NextDouble() * 100, 2) },
                 { "memory_utilization", Math.Round(new Random().NextDouble() * 100, 2) }
             }
-        };
+        });
     }
 
-    public async Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
+    public Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
     {
         var random = new Random();
-        return new ServiceMetrics
+        return Task.FromResult(new ServiceMetrics
         {
             ServiceInstanceId = serviceInstance.Id,
             Timestamp = DateTime.UtcNow,
@@ -402,7 +402,7 @@ public class RDSDatabaseServiceProvider : IServiceProvider
                 ["memory_utilization"] = random.NextDouble() * 100,
                 ["storage_used_mb"] = serviceInstance.CurrentUsage / (1024 * 1024)
             }
-        };
+        });
     }
 
     private async Task CreateDatabaseSchemaAsync(string databaseName, ServiceInstance serviceInstance)
@@ -468,19 +468,19 @@ public class NoSQLDatabaseServiceProvider : IServiceProvider
         return new ServiceProvisioningResult { Success = true };
     }
 
-    public async Task<ServiceProvisioningResult> StartAsync(ServiceInstance serviceInstance)
+    public Task<ServiceProvisioningResult> StartAsync(ServiceInstance serviceInstance)
     {
-        return new ServiceProvisioningResult { Success = true };
+        return Task.FromResult(new ServiceProvisioningResult { Success = true });
     }
 
-    public async Task<ServiceProvisioningResult> StopAsync(ServiceInstance serviceInstance)
+    public Task<ServiceProvisioningResult> StopAsync(ServiceInstance serviceInstance)
     {
-        return new ServiceProvisioningResult { Success = true };
+        return Task.FromResult(new ServiceProvisioningResult { Success = true });
     }
 
-    public async Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
+    public Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
     {
-        return new ServiceStatus
+        return Task.FromResult(new ServiceStatus
         {
             Status = "Running",
             LastChecked = DateTime.UtcNow,
@@ -489,13 +489,13 @@ public class NoSQLDatabaseServiceProvider : IServiceProvider
                 { "throughput", "provisioned" },
                 { "health", "healthy" }
             }
-        };
+        });
     }
 
-    public async Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
+    public Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
     {
         var random = new Random();
-        return new ServiceMetrics
+        return Task.FromResult(new ServiceMetrics
         {
             ServiceInstanceId = serviceInstance.Id,
             Timestamp = DateTime.UtcNow,
@@ -507,7 +507,7 @@ public class NoSQLDatabaseServiceProvider : IServiceProvider
                 ["consumed_write_capacity"] = random.NextDouble() * 5,
                 ["item_count"] = random.Next(100, 10000)
             }
-        };
+        });
     }
 
     private async Task CreateNoSQLNamespaceAsync(ServiceInstance serviceInstance)
@@ -577,20 +577,20 @@ public class QueueServiceProvider : IServiceProvider
         return new ServiceProvisioningResult { Success = true };
     }
 
-    public async Task<ServiceProvisioningResult> StartAsync(ServiceInstance serviceInstance)
+    public Task<ServiceProvisioningResult> StartAsync(ServiceInstance serviceInstance)
     {
-        return new ServiceProvisioningResult { Success = true };
+        return Task.FromResult(new ServiceProvisioningResult { Success = true });
     }
 
-    public async Task<ServiceProvisioningResult> StopAsync(ServiceInstance serviceInstance)
+    public Task<ServiceProvisioningResult> StopAsync(ServiceInstance serviceInstance)
     {
-        return new ServiceProvisioningResult { Success = true };
+        return Task.FromResult(new ServiceProvisioningResult { Success = true });
     }
 
-    public async Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
+    public Task<ServiceStatus> GetStatusAsync(ServiceInstance serviceInstance)
     {
         var random = new Random();
-        return new ServiceStatus
+        var status = new ServiceStatus
         {
             Status = "Running",
             LastChecked = DateTime.UtcNow,
@@ -601,12 +601,13 @@ public class QueueServiceProvider : IServiceProvider
                 { "health", "healthy" }
             }
         };
+        return Task.FromResult(status);
     }
 
-    public async Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
+    public Task<ServiceMetrics> GetMetricsAsync(ServiceInstance serviceInstance)
     {
         var random = new Random();
-        return new ServiceMetrics
+        var metrics = new ServiceMetrics
         {
             ServiceInstanceId = serviceInstance.Id,
             Timestamp = DateTime.UtcNow,
@@ -618,6 +619,7 @@ public class QueueServiceProvider : IServiceProvider
                 ["approximate_age_seconds"] = random.NextDouble() * 3600
             }
         };
+        return Task.FromResult(metrics);
     }
 
     private async Task CreateQueueAsync(string queueName, ServiceInstance serviceInstance)

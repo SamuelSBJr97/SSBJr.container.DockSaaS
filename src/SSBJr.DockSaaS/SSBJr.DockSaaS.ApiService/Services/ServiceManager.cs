@@ -219,15 +219,15 @@ public class ServiceManager : IServiceManager
             ["currentUsage"] = serviceInstance.CurrentUsage,
             ["usageQuota"] = serviceInstance.UsageQuota,
             ["usagePercent"] = serviceInstance.UsageQuota > 0 ? (double)serviceInstance.CurrentUsage / serviceInstance.UsageQuota * 100 : 0,
-            ["lastAccessed"] = serviceInstance.LastAccessedAt,
+            ["lastAccessed"] = serviceInstance.LastAccessedAt ?? DateTime.MinValue,
             ["uptime"] = serviceInstance.Status == "Running" ? DateTime.UtcNow - serviceInstance.UpdatedAt : TimeSpan.Zero,
-            ["metrics"] = serviceInstance.Metrics.Select(m => new
+            ["metrics"] = serviceInstance.Metrics?.Select(m => new
             {
                 name = m.MetricName,
                 value = m.Value,
                 unit = m.Unit,
                 timestamp = m.Timestamp
-            }).ToList()
+            }).Cast<object>().ToList() ?? new List<object>()
         };
 
         return status;

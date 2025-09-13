@@ -28,10 +28,33 @@ public class KafkaManagementService : IKafkaManagementService, IDisposable
         _configuration = configuration;
         _logger = logger;
         
-        // Get Kafka connection string from Aspire configuration
-        _bootstrapServers = _configuration.GetConnectionString("kafka") ?? "localhost:9092";
+        // Try to get Kafka connection string from various sources
+        _bootstrapServers = GetKafkaBootstrapServers();
         
         _logger.LogInformation("Kafka Management Service initialized with bootstrap servers: {BootstrapServers}", _bootstrapServers);
+    }
+
+    private string GetKafkaBootstrapServers()
+    {
+        // Try Aspire connection string first
+        var connectionString = _configuration.GetConnectionString("kafka");
+        if (!string.IsNullOrEmpty(connectionString))
+        {
+            _logger.LogInformation("Using Aspire Kafka connection string: {ConnectionString}", connectionString);
+            return connectionString;
+        }
+
+        // Try Kafka configuration section
+        var kafkaConfig = _configuration.GetSection("Kafka:BootstrapServers").Value;
+        if (!string.IsNullOrEmpty(kafkaConfig))
+        {
+            _logger.LogInformation("Using Kafka configuration: {KafkaConfig}", kafkaConfig);
+            return kafkaConfig;
+        }
+
+        // Fallback to default
+        _logger.LogWarning("No Kafka configuration found, using default localhost:9092");
+        return "localhost:9092";
     }
 
     private IAdminClient GetAdminClient()
@@ -42,7 +65,8 @@ public class KafkaManagementService : IKafkaManagementService, IDisposable
             {
                 BootstrapServers = _bootstrapServers,
                 SecurityProtocol = SecurityProtocol.Plaintext,
-                SocketTimeoutMs = 30000
+                SocketTimeoutMs = 10000, // Reduced timeout
+                ConnectionsMaxIdleMs = 30000
             };
             
             _adminClient = new AdminClientBuilder(config).Build();
@@ -61,7 +85,7 @@ public class KafkaManagementService : IKafkaManagementService, IDisposable
                 SecurityProtocol = SecurityProtocol.Plaintext,
                 Acks = Acks.All,
                 RetryBackoffMs = 1000,
-                MessageTimeoutMs = 30000
+                MessageTimeoutMs = 10000 // Reduced timeout
             };
             
             _producer = new ProducerBuilder<string, string>(config).Build();
@@ -74,17 +98,35 @@ public class KafkaManagementService : IKafkaManagementService, IDisposable
     {
         try
         {
-            _logger.LogInformation("Testing Kafka connection...");
+            _logger.LogInformation("Testing Kafka connection to: {BootstrapServers}", _bootstrapServers);
             
             var adminClient = GetAdminClient();
-            var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));
+            var metadata = await Task.Run(() => adminClient.GetMetadata(TimeSpan.FromSeconds(5)));
             
-            _logger.LogInformation("Kafka connection successful. Found {BrokerCount} brokers", metadata.Brokers.Count);
-            return true;
+            if (metadata.Brokers.Count > 0)
+            {
+                _logger.LogInformation("Kafka connection successful. Found {BrokerCount} brokers", metadata.Brokers.Count);
+                return true;
+            }
+            else
+            {
+                _logger.LogWarning("Kafka metadata received but no brokers found");
+                return false;
+            }
+        }
+        catch (KafkaException ex)
+        {
+            _logger.LogError(ex, "Kafka connection failed: {ErrorCode} - {ErrorReason}", ex.Error.Code, ex.Error.Reason);
+            return false;
+        }
+        catch (TimeoutException ex)
+        {
+            _logger.LogError(ex, "Kafka connection timeout - broker may not be available at {BootstrapServers}", _bootstrapServers);
+            return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to connect to Kafka");
+            _logger.LogError(ex, "Unexpected error testing Kafka connection to {BootstrapServers}", _bootstrapServers);
             return false;
         }
     }
