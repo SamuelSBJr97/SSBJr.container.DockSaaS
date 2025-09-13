@@ -1,184 +1,195 @@
 @page "/settings/tenant"
 @attribute [Authorize(Roles = "Admin")]
-@inject ISnackbar Snackbar
 
 <PageTitle>Tenant Settings - DockSaaS</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Tenant Settings</MudText>
+<h3 class="text-2xl font-bold text-gray-900 mb-6">Tenant Settings</h3>
 
-<MudGrid>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- General Settings -->
-    <MudItem xs="12" md="8">
-        <MudCard Elevation="4" Class="mb-4">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">General Information</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudForm @ref="form" @bind-IsValid="@isFormValid">
-                    <MudGrid>
-                        <MudItem xs="12" md="6">
-                            <MudTextField @bind-Value="tenantSettings.Name"
-                                          Label="Organization Name"
-                                          Variant="Variant.Outlined"
-                                          Required="true"
-                                          Class="mb-3" />
-                        </MudItem>
-                        <MudItem xs="12" md="6">
-                            <MudSelect @bind-Value="tenantSettings.Plan" Label="Plan" Variant="Variant.Outlined" Class="mb-3">
-                                <MudSelectItem Value="@("Free")">Free</MudSelectItem>
-                                <MudSelectItem Value="@("Pro")">Pro</MudSelectItem>
-                                <MudSelectItem Value="@("Enterprise")">Enterprise</MudSelectItem>
-                            </MudSelect>
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField @bind-Value="tenantSettings.Description"
-                                          Label="Description"
-                                          Variant="Variant.Outlined"
-                                          Lines="3"
-                                          Class="mb-3" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField @bind-Value="tenantSettings.LogoUrl"
-                                          Label="Logo URL"
-                                          Variant="Variant.Outlined"
-                                          Class="mb-3" />
-                        </MudItem>
-                    </MudGrid>
-                </MudForm>
-            </MudCardContent>
-            <MudCardActions>
-                <MudButton Color="Color.Primary" 
-                           Variant="Variant.Filled" 
-                           OnClick="SaveGeneralSettings"
-                           Disabled="!isFormValid || isSaving">
+    <div class="lg:col-span-2">
+        <div class="bg-white rounded-lg shadow-lg mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h6 class="text-lg font-semibold text-gray-900">General Information</h6>
+            </div>
+            <div class="p-6">
+                <form @onsubmit="HandleBasicSettingsSubmit" @onsubmit:preventDefault="true">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Organization Name</label>
+                            <input @bind="tenantSettings.Name"
+                                   type="text" 
+                                   required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+                            <select @bind="tenantSettings.Plan" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3">
+                                <option value="Free">Free</option>
+                                <option value="Pro">Pro</option>
+                                <option value="Enterprise">Enterprise</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                            <textarea @bind="tenantSettings.Description"
+                                      rows="3"
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3"></textarea>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
+                            <input @bind="tenantSettings.LogoUrl"
+                                   type="url"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3" />
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200">
+                <button @onclick="SaveGeneralSettings"
+                        disabled="@(!isFormValid || isSaving)"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
                     @if (isSaving)
                     {
-                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                        <MudText Class="ms-2">Saving...</MudText>
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <text>Saving...</text>
                     }
                     else
                     {
-                        <span>Save Changes</span>
+                        <text>Save Changes</text>
                     }
-                </MudButton>
-            </MudCardActions>
-        </MudCard>
+                </button>
+            </div>
+        </div>
 
         <!-- Resource Limits -->
-        <MudCard Elevation="4" Class="mb-4">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Resource Limits</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudGrid>
-                    <MudItem xs="12" md="4">
-                        <MudNumericField @bind-Value="tenantSettings.UserLimit"
-                                         Label="Maximum Users"
-                                         Variant="Variant.Outlined"
-                                         Min="1"
-                                         Class="mb-3" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudNumericField @bind-Value="storageLimit"
-                                         Label="Storage Limit (GB)"
-                                         Variant="Variant.Outlined"
-                                         Min="0"
-                                         Class="mb-3" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudNumericField @bind-Value="tenantSettings.ApiCallsLimit"
-                                         Label="API Calls Limit (per month)"
-                                         Variant="Variant.Outlined"
-                                         Min="0"
-                                         Class="mb-3" />
-                    </MudItem>
-                </MudGrid>
-            </MudCardContent>
-            <MudCardActions>
-                <MudButton Color="Color.Primary" 
-                           Variant="Variant.Filled" 
-                           OnClick="SaveLimits"
-                           Disabled="isSaving">
+        <div class="bg-white rounded-lg shadow-lg mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h6 class="text-lg font-semibold text-gray-900">Resource Limits</h6>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Maximum Users</label>
+                        <input @bind="tenantSettings.UserLimit"
+                               type="number" 
+                               min="1"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Storage Limit (GB)</label>
+                        <input @bind="storageLimit"
+                               type="number" 
+                               min="0"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">API Calls Limit (per month)</label>
+                        <input @bind="tenantSettings.ApiCallsLimit"
+                               type="number" 
+                               min="0"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3" />
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200">
+                <button @onclick="SaveLimits"
+                        disabled="@isSaving"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
                     Save Limits
-                </MudButton>
-            </MudCardActions>
-        </MudCard>
-    </MudItem>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Current Usage -->
-    <MudItem xs="12" md="4">
-        <MudCard Elevation="4" Class="mb-4">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Current Usage</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
+    <div>
+        <div class="bg-white rounded-lg shadow-lg mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h6 class="text-lg font-semibold text-gray-900">Current Usage</h6>
+            </div>
+            <div class="p-6">
                 <div class="mb-4">
-                    <div class="d-flex justify-space-between mb-2">
-                        <MudText Typo="Typo.body1">Users</MudText>
-                        <MudText Typo="Typo.body2">@tenantSettings.CurrentUsers / @tenantSettings.UserLimit</MudText>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Users</span>
+                        <span class="text-sm text-gray-500">@tenantSettings.CurrentUsers / @tenantSettings.UserLimit</span>
                     </div>
-                    <MudProgressLinear Value="@GetUserUsagePercent()" Color="@GetUsageColor(GetUserUsagePercent())" />
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="@GetUsageBarClasses(GetUserUsagePercent()) h-2 rounded-full" style="width: @GetUserUsagePercent().ToString("F1")%"></div>
+                    </div>
                 </div>
 
                 <div class="mb-4">
-                    <div class="d-flex justify-space-between mb-2">
-                        <MudText Typo="Typo.body1">Storage</MudText>
-                        <MudText Typo="Typo.body2">@FormatBytes(tenantSettings.CurrentStorage) / @FormatBytes(tenantSettings.StorageLimit)</MudText>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Storage</span>
+                        <span class="text-sm text-gray-500">@FormatBytes(tenantSettings.CurrentStorage) / @FormatBytes(tenantSettings.StorageLimit)</span>
                     </div>
-                    <MudProgressLinear Value="@GetStorageUsagePercent()" Color="@GetUsageColor(GetStorageUsagePercent())" />
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="@GetUsageBarClasses(GetStorageUsagePercent()) h-2 rounded-full" style="width: @GetStorageUsagePercent().ToString("F1")%"></div>
+                    </div>
                 </div>
 
                 <div class="mb-4">
-                    <div class="d-flex justify-space-between mb-2">
-                        <MudText Typo="Typo.body1">API Calls</MudText>
-                        <MudText Typo="Typo.body2">@tenantSettings.CurrentApiCalls.ToString("N0") / @tenantSettings.ApiCallsLimit.ToString("N0")</MudText>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">API Calls</span>
+                        <span class="text-sm text-gray-500">@tenantSettings.CurrentApiCalls.ToString("N0") / @tenantSettings.ApiCallsLimit.ToString("N0")</span>
                     </div>
-                    <MudProgressLinear Value="@GetApiCallsUsagePercent()" Color="@GetUsageColor(GetApiCallsUsagePercent())" />
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="@GetUsageBarClasses(GetApiCallsUsagePercent()) h-2 rounded-full" style="width: @GetApiCallsUsagePercent().ToString("F1")%"></div>
+                    </div>
                 </div>
-            </MudCardContent>
-        </MudCard>
+            </div>
+        </div>
 
         <!-- Plan Information -->
-        <MudCard Elevation="4">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Plan Information</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <div class="mb-3">
-                    <MudText Typo="Typo.h5" Color="Color.Primary">@tenantSettings.Plan Plan</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+        <div class="bg-white rounded-lg shadow-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h6 class="text-lg font-semibold text-gray-900">Plan Information</h6>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <h5 class="text-lg font-semibold text-blue-600">@tenantSettings.Plan Plan</h5>
+                    <p class="text-sm text-gray-500">
                         Active since @tenantSettings.CreatedAt.ToString("MMM dd, yyyy")
-                    </MudText>
+                    </p>
                 </div>
 
-                <MudList Dense="true">
-                    <MudListItem Icon="Icons.Material.Filled.People" Text="@($"{tenantSettings.UserLimit} Users")" />
-                    <MudListItem Icon="Icons.Material.Filled.Storage" Text="@($"{FormatBytes(tenantSettings.StorageLimit)} Storage")" />
-                    <MudListItem Icon="Icons.Material.Filled.Api" Text="@($"{tenantSettings.ApiCallsLimit:N0} API Calls/month")" />
-                </MudList>
-            </MudCardContent>
-            <MudCardActions>
-                <MudButton Color="Color.Primary" 
-                           Variant="Variant.Outlined" 
-                           FullWidth="true"
-                           OnClick="UpgradePlan">
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <svg class="h-5 w-5 text-gray-400 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                        </svg>
+                        <span class="text-sm text-gray-700">@tenantSettings.UserLimit Users</span>
+                    </div>
+                    <div class="flex items-center">
+                        <svg class="h-5 w-5 text-gray-400 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="text-sm text-gray-700">@FormatBytes(tenantSettings.StorageLimit) Storage</span>
+                    </div>
+                    <div class="flex items-center">
+                        <svg class="h-5 w-5 text-gray-400 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="text-sm text-gray-700">@tenantSettings.ApiCallsLimit.ToString("N0") API Calls/month</span>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200">
+                <button @onclick="UpgradePlan"
+                        class="w-full px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     @(tenantSettings.Plan == "Free" ? "Upgrade Plan" : "Change Plan")
-                </MudButton>
-            </MudCardActions>
-        </MudCard>
-    </MudItem>
-</MudGrid>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @code {
-    private MudForm form = null!;
+    private ElementReference form;
     private bool isFormValid = false;
     private bool isSaving = false;
     private TenantSettingsModel tenantSettings = new();
@@ -216,16 +227,21 @@
         {
             // Simulate API call
             await Task.Delay(1000);
-            Snackbar.Add("General settings saved successfully", Severity.Success);
+            Console.WriteLine("Notification");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Snackbar.Add($"Failed to save settings: {ex.Message}", Severity.Error);
+            Console.WriteLine("Notification");
         }
         finally
         {
             isSaving = false;
         }
+    }
+
+    private async Task HandleBasicSettingsSubmit()
+    {
+        await SaveGeneralSettings();
     }
 
     private async Task SaveLimits()
@@ -236,11 +252,11 @@
             tenantSettings.StorageLimit = storageLimit * 1073741824L; // Convert GB to bytes
             // Simulate API call
             await Task.Delay(1000);
-            Snackbar.Add("Resource limits updated successfully", Severity.Success);
+            Console.WriteLine("Notification");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Snackbar.Add($"Failed to update limits: {ex.Message}", Severity.Error);
+            Console.WriteLine("Notification");
         }
         finally
         {
@@ -250,7 +266,7 @@
 
     private void UpgradePlan()
     {
-        Snackbar.Add("Plan upgrade not yet implemented", Severity.Info);
+        Console.WriteLine("Notification");
     }
 
     private double GetUserUsagePercent()
@@ -268,11 +284,11 @@
         return tenantSettings.ApiCallsLimit > 0 ? (double)tenantSettings.CurrentApiCalls / tenantSettings.ApiCallsLimit * 100 : 0;
     }
 
-    private Color GetUsageColor(double percentage) => percentage switch
+    private string GetUsageBarClasses(double percentage) => percentage switch
     {
-        var x when x < 70 => Color.Success,
-        var x when x < 90 => Color.Warning,
-        _ => Color.Error
+        var x when x < 70 => "bg-green-500",
+        var x when x < 90 => "bg-yellow-500",
+        _ => "bg-red-500"
     };
 
     private string FormatBytes(long bytes)

@@ -2,155 +2,169 @@
 @attribute [Authorize]
 @inject IServiceInstanceService ServiceInstanceService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
 @using System.Text.Json
 
 <PageTitle>Create Service - DockSaaS</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Create New Service</MudText>
+<h3 class="text-2xl font-bold text-gray-900 mb-6">Create New Service</h3>
 
-<MudCard Elevation="4">
-    <MudCardContent>
-        <MudForm @ref="form" @bind-IsValid="@success">
-            <MudGrid>
+<div class="bg-white rounded-lg shadow-lg">
+    <div class="p-6">
+        <form @onsubmit="SubmitForm" @onsubmit:preventDefault="true">
+            <div class="space-y-6">
                 <!-- Service Selection -->
-                <MudItem xs="12">
-                    <MudText Typo="Typo.h6" GutterBottom="true">Select Service Type</MudText>
+                <div>
+                    <h6 class="text-lg font-semibold text-gray-900 mb-4">Select Service Type</h6>
                     @if (isLoadingDefinitions)
                     {
-                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full animate-pulse" style="width: 100%"></div>
+                        </div>
                     }
                     else
                     {
-                        <MudGrid>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                             @foreach (var definition in serviceDefinitions)
                             {
-                                <MudItem xs="12" sm="6" md="4">
-                                    <MudCard Elevation="@(selectedDefinition?.Id == definition.Id ? 8 : 2)" 
-                                             Class="@(selectedDefinition?.Id == definition.Id ? "mud-theme-primary" : "")"
-                                             Style="cursor: pointer; height: 100%;"
-                                             @onclick="@(() => SelectServiceDefinition(definition))">
-                                        <MudCardContent Class="text-center">
-                                            <MudIcon Icon="@GetServiceIcon(definition.Type)" 
-                                                     Size="Size.Large" 
-                                                     Color="@(selectedDefinition?.Id == definition.Id ? Color.Inherit : Color.Primary)" 
-                                                     Class="mb-2" />
-                                            <MudText Typo="Typo.h6">@definition.Name</MudText>
-                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                <div class="col-span-1">
+                                    <div class="@(selectedDefinition?.Id == definition.Id ? "bg-blue-50 border-blue-500 shadow-lg" : "bg-white border-gray-200 shadow-md") border rounded-lg p-4 cursor-pointer h-full hover:shadow-lg transition-shadow duration-200"
+                                         @onclick="@(() => SelectServiceDefinition(definition))">
+                                        <div class="text-center">
+                                            <div class="text-3xl mb-2">@GetServiceIcon(definition.Type)</div>
+                                            <h6 class="text-lg font-semibold text-gray-900">@definition.Name</h6>
+                                            <p class="text-sm text-gray-600">
                                                 @definition.Description
-                                            </MudText>
-                                        </MudCardContent>
-                                    </MudCard>
-                                </MudItem>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                             }
-                        </MudGrid>
+                        </div>
                     }
-                </MudItem>
+                </div>
 
                 @if (selectedDefinition != null)
                 {
                     <!-- Service Configuration -->
-                    <MudItem xs="12">
-                        <MudDivider Class="my-4" />
-                        <MudText Typo="Typo.h6" GutterBottom="true">Configure @selectedDefinition.Name</MudText>
-                    </MudItem>
+                    <div>
+                        <hr class="my-6 border-gray-200" />
+                        <h6 class="text-lg font-semibold text-gray-900 mb-4">Configure @selectedDefinition.Name</h6>
+                    </div>
 
-                    <MudItem xs="12" md="6">
-                        <MudTextField @bind-Value="serviceName"
-                                      For="@(() => serviceName)"
-                                      Label="Service Name"
-                                      Variant="Variant.Outlined"
-                                      Required="true"
-                                      HelperText="Unique name for your service instance" />
-                    </MudItem>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
+                            <input @bind="serviceName"
+                                   type="text" 
+                                   required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            <p class="mt-1 text-sm text-gray-500">Unique name for your service instance</p>
+                        </div>
 
-                    <MudItem xs="12" md="6">
-                        <MudNumericField @bind-Value="usageQuota"
-                                         For="@(() => usageQuota)"
-                                         Label="Usage Quota (bytes)"
-                                         Variant="Variant.Outlined"
-                                         Min="0"
-                                         HelperText="0 = unlimited" />
-                    </MudItem>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Usage Quota (bytes)</label>
+                            <input @bind="usageQuota"
+                                   type="number" 
+                                   min="0"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            <p class="mt-1 text-sm text-gray-500">0 = unlimited</p>
+                        </div>
+                    </div>
 
                     <!-- Dynamic Configuration Fields -->
-                    <MudItem xs="12">
-                        <MudExpansionPanels>
-                            <MudExpansionPanel Text="Advanced Configuration">
+                    <div>
+                        <details class="bg-gray-50 rounded-lg p-4">
+                            <summary class="font-medium text-gray-900 cursor-pointer">Advanced Configuration</summary>
+                            <div class="mt-4">
                                 @if (configurationFields.Any())
                                 {
-                                    <MudGrid>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         @foreach (var field in configurationFields)
                                         {
-                                            <MudItem xs="12" md="6">
+                                            <div>
                                                 @if (field.Type == "string")
                                                 {
-                                                    <MudTextField @bind-Value="field.Value"
-                                                                  Label="@field.Label"
-                                                                  Variant="Variant.Outlined"
-                                                                  HelperText="@field.Description" />
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">@field.Label</label>
+                                                    <input @bind="field.Value"
+                                                           type="text"
+                                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                                                    @if (!string.IsNullOrEmpty(field.Description))
+                                                    {
+                                                        <p class="mt-1 text-sm text-gray-500">@field.Description</p>
+                                                    }
                                                 }
                                                 else if (field.Type == "boolean")
                                                 {
-                                                    <MudSwitch @bind-Value="field.BoolValue"
-                                                               Label="@field.Label"
-                                                               Color="Color.Primary" />
+                                                    <label class="flex items-center">
+                                                        <input @bind="field.BoolValue"
+                                                               type="checkbox"
+                                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" />
+                                                        <span class="ml-2 text-sm font-medium text-gray-700">@field.Label</span>
+                                                    </label>
                                                 }
                                                 else if (field.Type == "integer")
                                                 {
-                                                    <MudNumericField @bind-Value="field.IntValue"
-                                                                     Label="@field.Label"
-                                                                     Variant="Variant.Outlined"
-                                                                     HelperText="@field.Description" />
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">@field.Label</label>
+                                                    <input @bind="field.IntValue"
+                                                           type="number"
+                                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                                                    @if (!string.IsNullOrEmpty(field.Description))
+                                                    {
+                                                        <p class="mt-1 text-sm text-gray-500">@field.Description</p>
+                                                    }
                                                 }
-                                            </MudItem>
+                                            </div>
                                         }
-                                    </MudGrid>
+                                    </div>
                                 }
                                 else
                                 {
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    <p class="text-sm text-gray-500">
                                         No additional configuration required for this service type.
-                                    </MudText>
+                                    </p>
                                 }
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    </MudItem>
+                            </div>
+                        </details>
+                    </div>
 
                     <!-- Actions -->
-                    <MudItem xs="12">
-                        <MudDivider Class="my-4" />
-                        <div class="d-flex justify-end gap-2">
-                            <MudButton Variant="Variant.Text" 
-                                       Color="Color.Default"
-                                       OnClick="Cancel">
+                    <div>
+                        <hr class="my-6 border-gray-200" />
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" 
+                                    @onclick="Cancel"
+                                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                 Cancel
-                            </MudButton>
-                            <MudButton Variant="Variant.Filled" 
-                                       Color="Color.Primary"
-                                       OnClick="CreateServiceInstance"
-                                       Disabled="@(!success || isCreating)"
-                                       StartIcon="@(isCreating ? null : Icons.Material.Filled.Add)">
+                            </button>
+                            <button type="button" 
+                                    @onclick="CreateServiceInstance"
+                                    disabled="@(!success || isCreating)"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
                                 @if (isCreating)
                                 {
-                                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                                    <MudText Class="ms-2">Creating...</MudText>
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <text>Creating...</text>
                                 }
                                 else
                                 {
-                                    <span>Create Service</span>
+                                    <span class="mr-2">➕</span>
+                                    <text>Create Service</text>
                                 }
-                            </MudButton>
+                            </button>
                         </div>
-                    </MudItem>
+                    </div>
                 }
-            </MudGrid>
-        </MudForm>
-    </MudCardContent>
-</MudCard>
+            </div>
+        </form>
+    </div>
+</div>
 
 @code {
-    private MudForm form = null!;
+    private ElementReference form;
     private bool success = false;
     private bool isLoadingDefinitions = true;
     private bool isCreating = false;
@@ -176,7 +190,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load service definitions: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Failed to load service definitions: {ex.Message}");
         }
         finally
         {
@@ -230,7 +244,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to parse configuration schema: {ex.Message}", Severity.Warning);
+            Console.WriteLine($"Failed to parse configuration schema: {ex.Message}");
         }
     }
 
@@ -255,22 +269,27 @@
             
             if (result != null)
             {
-                Snackbar.Add($"Service '{serviceName}' created successfully", Severity.Success);
+                Console.WriteLine($"Service '{serviceName}' created successfully");
                 Navigation.NavigateTo($"/services/{result.Id}");
             }
             else
             {
-                Snackbar.Add("Failed to create service", Severity.Error);
+                Console.WriteLine("Failed to create service");
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error creating service: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Error creating service: {ex.Message}");
         }
         finally
         {
             isCreating = false;
         }
+    }
+
+    private async Task SubmitForm()
+    {
+        await CreateServiceInstance();
     }
 
     private string BuildConfiguration()
@@ -299,12 +318,12 @@
 
     private string GetServiceIcon(string serviceType) => serviceType switch
     {
-        "S3Storage" => Icons.Material.Filled.Storage,
-        "RDSDatabase" => Icons.Material.Filled.Storage, // Using Storage as Database is not available
-        "NoSQLDatabase" => Icons.Material.Filled.TableChart,
-        "Queue" => Icons.Material.Filled.Queue,
-        "Function" => Icons.Material.Filled.Functions,
-        _ => Icons.Material.Filled.Cloud
+        "S3Storage" => "💾",
+        "RDSDatabase" => "🗄️",
+        "NoSQLDatabase" => "📊",
+        "Queue" => "📋",
+        "Function" => "⚡",
+        _ => "☁️"
     };
 
     private string FormatFieldLabel(string fieldName)

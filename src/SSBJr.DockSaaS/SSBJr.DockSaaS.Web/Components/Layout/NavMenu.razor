@@ -1,37 +1,151 @@
-﻿@using MudBlazor
+﻿@using Microsoft.AspNetCore.Components.Routing
 
-<MudNavMenu>
-    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="Icons.Material.Filled.Dashboard">
-        Dashboard
-    </MudNavLink>
+<nav class="space-y-2">
+    <!-- Dashboard -->
+    <NavLink href="/" class="@($"nav-item {GetActiveClass("/")}")" Match="NavLinkMatch.All">
+        <svg class="nav-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+        </svg>
+        <span>Dashboard</span>
+    </NavLink>
     
-    <MudNavGroup Text="Services" Icon="Icons.Material.Filled.CloudQueue" Expanded="true">
-        <MudNavLink Href="/services" Icon="Icons.Material.Filled.List">
-            All Services
-        </MudNavLink>
-        <MudNavLink Href="/services/create" Icon="Icons.Material.Filled.Add">
-            Create Service
-        </MudNavLink>
-    </MudNavGroup>
+    <!-- Services Group -->
+    <div class="space-y-1">
+        <button @onclick="ToggleServicesGroup" 
+                class="w-full nav-item justify-between @(_servicesExpanded ? "active" : "")">
+            <div class="flex items-center gap-3">
+                <svg class="nav-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h6a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h6a2 2 0 002-2v-4a2 2 0 00-2-2m8-8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z"></path>
+                </svg>
+                <span>Services</span>
+            </div>
+            <svg class="w-4 h-4 transition-transform duration-200 @(_servicesExpanded ? "rotate-180" : "")" 
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        
+        @if (_servicesExpanded)
+        {
+            <div class="pl-8 space-y-1 animate-slide-down">
+                <NavLink href="/services" class="@($"nav-item text-sm {GetActiveClass("/services")}")">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                    </svg>
+                    <span>All Services</span>
+                </NavLink>
+                <NavLink href="/services/create" class="@($"nav-item text-sm {GetActiveClass("/services/create")}")">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span>Create Service</span>
+                </NavLink>
+            </div>
+        }
+    </div>
     
-    <MudNavLink Href="/users" Icon="Icons.Material.Filled.People">
-        Users
-    </MudNavLink>
+    <!-- Users -->
+    <NavLink href="/users" class="@($"nav-item {GetActiveClass("/users")}")">
+        <svg class="nav-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+        </svg>
+        <span>Users</span>
+    </NavLink>
     
-    <MudNavLink Href="/logs" Icon="Icons.Material.Filled.History">
-        Audit Logs
-    </MudNavLink>
+    <!-- Audit Logs -->
+    <NavLink href="/logs" class="@($"nav-item {GetActiveClass("/logs")}")">
+        <svg class="nav-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span>Audit Logs</span>
+    </NavLink>
     
-    <MudNavGroup Text="Settings" Icon="Icons.Material.Filled.Settings">
-        <MudNavLink Href="/settings/tenant" Icon="Icons.Material.Filled.Business">
-            Tenant Settings
-        </MudNavLink>
-        <MudNavLink Href="/settings/notifications" Icon="Icons.Material.Filled.Notifications">
-            Notifications
-        </MudNavLink>
-    </MudNavGroup>
+    <!-- Settings Group -->
+    <div class="space-y-1">
+        <button @onclick="ToggleSettingsGroup" 
+                class="w-full nav-item justify-between @(_settingsExpanded ? "active" : "")">
+            <div class="flex items-center gap-3">
+                <svg class="nav-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span>Settings</span>
+            </div>
+            <svg class="w-4 h-4 transition-transform duration-200 @(_settingsExpanded ? "rotate-180" : "")" 
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        
+        @if (_settingsExpanded)
+        {
+            <div class="pl-8 space-y-1 animate-slide-down">
+                <NavLink href="/settings/tenant" class="@($"nav-item text-sm {GetActiveClass("/settings/tenant")}")">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                    <span>Tenant Settings</span>
+                </NavLink>
+                <NavLink href="/settings/notifications" class="@($"nav-item text-sm {GetActiveClass("/settings/notifications")}")">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                    <span>Notifications</span>
+                </NavLink>
+            </div>
+        }
+    </div>
     
-    <MudNavLink Href="/monitoring" Icon="Icons.Material.Filled.MonitorHeart">
-        Monitoring
-    </MudNavLink>
-</MudNavMenu>
+    <!-- Monitoring -->
+    <NavLink href="/monitoring" class="@($"nav-item {GetActiveClass("/monitoring")}")">
+        <svg class="nav-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+        <span>Monitoring</span>
+    </NavLink>
+</nav>
+
+@code {
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+    
+    private bool _servicesExpanded = true;
+    private bool _settingsExpanded = false;
+    private string _currentUrl = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _currentUrl = NavigationManager.Uri;
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _currentUrl = e.Location;
+        StateHasChanged();
+    }
+
+    private void ToggleServicesGroup()
+    {
+        _servicesExpanded = !_servicesExpanded;
+    }
+
+    private void ToggleSettingsGroup()
+    {
+        _settingsExpanded = !_settingsExpanded;
+    }
+
+    private string GetActiveClass(string href)
+    {
+        if (href == "/" && _currentUrl.EndsWith("/"))
+            return "active";
+        else if (href != "/" && _currentUrl.Contains(href))
+            return "active";
+        
+        return "";
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

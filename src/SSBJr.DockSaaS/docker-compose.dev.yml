@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for Development
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: docksaas-postgres-dev
+    environment:
+      POSTGRES_DB: docksaasdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - docksaas-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docksaasdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache for Development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: docksaas-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - docksaas-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin for development
+  pgadmin-dev:
+    image: dpage/pgadmin4:latest
+    container_name: docksaas-pgadmin-dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dev@docksaas.com
+      PGADMIN_DEFAULT_PASSWORD: dev
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres-dev
+    networks:
+      - docksaas-dev-network
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+
+networks:
+  docksaas-dev-network:
+    driver: bridge
+    name: docksaas-dev-network
+
+volumes:
+  postgres_dev_data:
+    name: docksaas-postgres-dev-data
+  redis_dev_data:
+    name: docksaas-redis-dev-data
+  pgladmin_dev_data:
+    name: docksaas-pgadmin-dev-data

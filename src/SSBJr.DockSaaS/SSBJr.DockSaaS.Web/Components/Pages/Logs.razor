@@ -1,124 +1,159 @@
 @page "/logs"
 @attribute [Authorize]
 @inject IDashboardService DashboardService
-@inject ISnackbar Snackbar
+
 
 <PageTitle>Audit Logs - DockSaaS</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Audit Logs</MudText>
+<div class="p-6">
+    <h1 class="text-3xl font-bold text-gray-900 mb-6">Audit Logs</h1>
 
-<MudCard Elevation="4" Class="mb-4">
-    <MudCardContent>
-        <MudGrid>
-            <MudItem xs="12" md="3">
-                <MudSelect @bind-Value="selectedLevel" Label="Level" Variant="Variant.Outlined">
-                    <MudSelectItem Value="@("All")">All Levels</MudSelectItem>
-                    <MudSelectItem Value="@("Info")">Info</MudSelectItem>
-                    <MudSelectItem Value="@("Warning")">Warning</MudSelectItem>
-                    <MudSelectItem Value="@("Error")">Error</MudSelectItem>
-                    <MudSelectItem Value="@("Critical")">Critical</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" md="3">
-                <MudSelect @bind-Value="selectedEntityType" Label="Entity Type" Variant="Variant.Outlined">
-                    <MudSelectItem Value="@("All")">All Types</MudSelectItem>
-                    <MudSelectItem Value="@("User")">User</MudSelectItem>
-                    <MudSelectItem Value="@("Service")">Service</MudSelectItem>
-                    <MudSelectItem Value="@("Tenant")">Tenant</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" md="3">
-                <MudDatePicker @bind-Date="fromDate" Label="From Date" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" md="3">
-                <MudDatePicker @bind-Date="toDate" Label="To Date" Variant="Variant.Outlined" />
-            </MudItem>
-        </MudGrid>
-    </MudCardContent>
-</MudCard>
+    <!-- Filters Card -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Log Level</label>
+                <select @onchange="OnLevelChanged" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="All">All Levels</option>
+                    <option value="Info">Info</option>
+                    <option value="Warning">Warning</option>
+                    <option value="Error">Error</option>
+                    <option value="Critical">Critical</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Entity Type</label>
+                <select @onchange="OnEntityTypeChanged" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="All">All Types</option>
+                    <option value="User">User</option>
+                    <option value="Service">Service</option>
+                    <option value="Tenant">Tenant</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+                <input type="date" @bind="fromDate" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+                <input type="date" @bind="toDate" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+        </div>
+    </div>
 
-@if (isLoading)
-{
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
-}
+    @if (isLoading)
+    {
+        <div class="mb-6">
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div class="bg-blue-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
+            </div>
+        </div>
+    }
 
-<MudCard Elevation="4">
-    <MudCardContent>
-        <MudTable Items="filteredLogs" 
-                  Hover="true" 
-                  Dense="true"
-                  FixedHeader="true"
-                  Height="600px">
-            <ToolBarContent>
-                <MudText Typo="Typo.h6">Activity Log</MudText>
-                <MudSpacer />
-                <MudTextField @bind-Value="searchString" 
-                              Placeholder="Search logs..." 
-                              Adornment="Adornment.Start" 
-                              AdornmentIcon="Icons.Material.Filled.Search" 
-                              IconSize="Size.Medium" 
-                              Class="mt-0" />
-                <MudButton Color="Color.Primary" 
-                           Variant="Variant.Text" 
-                           StartIcon="Icons.Material.Filled.Refresh"
-                           OnClick="LoadLogs"
-                           Class="ml-2">
-                    Refresh
-                </MudButton>
-            </ToolBarContent>
-            <HeaderContent>
-                <MudTh>Time</MudTh>
-                <MudTh>Level</MudTh>
-                <MudTh>User</MudTh>
-                <MudTh>Action</MudTh>
-                <MudTh>Entity</MudTh>
-                <MudTh>Description</MudTh>
-                <MudTh>IP Address</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Time">
-                    <MudText Typo="Typo.caption">@context.Timestamp.ToString("MMM dd HH:mm:ss")</MudText>
-                </MudTd>
-                <MudTd DataLabel="Level">
-                    <MudChip Size="Size.Small" Color="@GetLevelColor(context.Level)">
-                        @context.Level
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="User">
-                    @if (!string.IsNullOrEmpty(context.UserName))
-                    {
-                        <MudText Typo="Typo.body2">@context.UserName</MudText>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">System</MudText>
-                    }
-                </MudTd>
-                <MudTd DataLabel="Action">
-                    <MudText Typo="Typo.body2">@context.Action</MudText>
-                </MudTd>
-                <MudTd DataLabel="Entity">
-                    <MudText Typo="Typo.body2">@context.EntityType</MudText>
-                </MudTd>
-                <MudTd DataLabel="Description">
-                    @if (!string.IsNullOrEmpty(context.Description))
-                    {
-                        <MudText Typo="Typo.body2">@context.Description.TruncateWithEllipsis(50)</MudText>
-                    }
-                </MudTd>
-                <MudTd DataLabel="IP Address">
-                    @if (!string.IsNullOrEmpty(context.IpAddress))
-                    {
-                        <MudText Typo="Typo.caption">@context.IpAddress</MudText>
-                    }
-                </MudTd>
-            </RowTemplate>
-            <PagerContent>
-                <MudTablePager PageSizeOptions="new int[] { 25, 50, 100 }" />
-            </PagerContent>
-        </MudTable>
-    </MudCardContent>
-</MudCard>
+    <!-- Logs Table Card -->
+    <div class="bg-white rounded-lg shadow-md">
+        <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+            <h2 class="text-xl font-semibold text-gray-900">Activity Log</h2>
+            <div class="flex items-center space-x-4">
+                <div class="relative">
+                    <input type="text" @bind="searchString" @bind:event="oninput" placeholder="Search logs..." 
+                           class="pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <button @onclick="LoadLogs" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-2">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-hidden">
+            <div class="overflow-x-auto" style="max-height: 600px;">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Level</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach (var logItem in filteredLogs)
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500">@logItem.Timestamp.ToString("MMM dd HH:mm:ss")</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full @GetLevelClasses(logItem.Level)">
+                                        @logItem.Level
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if (!string.IsNullOrEmpty(logItem.UserName))
+                                    {
+                                        <div class="text-sm text-gray-900">@logItem.UserName</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-sm text-gray-500">System</div>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">@logItem.Action</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">@logItem.EntityType</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    @if (!string.IsNullOrEmpty(logItem.Description))
+                                    {
+                                        <div class="text-sm text-gray-900 max-w-xs truncate" title="@logItem.Description">
+                                            @(logItem.Description.Length > 50 ? logItem.Description.Substring(0, 50) + "..." : logItem.Description)
+                                        </div>
+                                    }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if (!string.IsNullOrEmpty(logItem.IpAddress))
+                                    {
+                                        <div class="text-sm text-gray-500">@logItem.IpAddress</div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination (if needed) -->
+        <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+            <div class="flex items-center justify-between">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Previous</a>
+                    <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Next</a>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Showing <span class="font-medium">@Math.Min(filteredLogs.Count, 25)</span> of <span class="font-medium">@filteredLogs.Count</span> results
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 @code {
     private bool isLoading = true;
@@ -161,14 +196,27 @@
                 auditLogs = GenerateMockLogs();
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Snackbar.Add($"Failed to load audit logs: {ex.Message}", Severity.Error);
+            // Log error or show notification
+            Console.WriteLine("Error loading logs");
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private void OnLevelChanged(ChangeEventArgs e)
+    {
+        selectedLevel = e.Value?.ToString() ?? "All";
+        StateHasChanged();
+    }
+
+    private void OnEntityTypeChanged(ChangeEventArgs e)
+    {
+        selectedEntityType = e.Value?.ToString() ?? "All";
+        StateHasChanged();
     }
 
     private List<AuditLogDto> GenerateMockLogs()
@@ -207,12 +255,13 @@
         return logs.OrderByDescending(l => l.Timestamp).ToList();
     }
 
-    private Color GetLevelColor(string level) => level switch
+    private string GetLevelClasses(string level) => level switch
     {
-        "Info" => Color.Info,
-        "Warning" => Color.Warning,
-        "Error" => Color.Error,
-        "Critical" => Color.Error,
-        _ => Color.Default
+        "Info" => "bg-blue-100 text-blue-800",
+        "Warning" => "bg-yellow-100 text-yellow-800",
+        "Error" => "bg-red-100 text-red-800",
+        "Critical" => "bg-red-100 text-red-800",
+        _ => "bg-gray-100 text-gray-800"
     };
 }
+

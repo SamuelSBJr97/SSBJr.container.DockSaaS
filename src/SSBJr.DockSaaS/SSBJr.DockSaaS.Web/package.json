@@ -1,0 +1,33 @@
+{
+  "name": "ssbjr.docksaas.web",
+  "version": "1.0.0",
+  "description": "DockSaaS Web Application with Tailwind CSS",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tailwindcss -i ./wwwroot/css/tailwind-input.css -o ./wwwroot/css/tailwind.css --watch",
+    "build": "tailwindcss -i ./wwwroot/css/tailwind-input.css -o ./wwwroot/css/tailwind.css --minify",
+    "build:dev": "tailwindcss -i ./wwwroot/css/tailwind-input.css -o ./wwwroot/css/tailwind.css",
+    "clean": "if exist .\\wwwroot\\css\\tailwind.css del .\\wwwroot\\css\\tailwind.css",
+    "lint:css": "prettier --check \"./wwwroot/css/**/*.css\"",
+    "format:css": "prettier --write \"./wwwroot/css/**/*.css\"",
+    "analyze": "tailwindcss -i ./wwwroot/css/tailwind-input.css -o ./tmp/analyze.css",
+    "precommit": "npm run build && npm run lint:css",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "tailwindcss",
+    "blazor",
+    "docksaas"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@tailwindcss/aspect-ratio": "^0.4.2",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/typography": "^0.5.16",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^3.4.17"
+  }
+}

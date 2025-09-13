@@ -1,128 +1,156 @@
 @page "/users"
 @attribute [Authorize(Roles = "Admin,Manager")]
-@inject ISnackbar Snackbar
+@using SSBJr.DockSaaS.Web.Components.Shared
 
 <PageTitle>Users - DockSaaS</PageTitle>
 
-<div class="d-flex align-center justify-space-between mb-4">
-    <MudText Typo="Typo.h3">User Management</MudText>
-    <MudButton Color="Color.Primary" 
-               Variant="Variant.Filled" 
-               StartIcon="Icons.Material.Filled.PersonAdd"
-               OnClick="OpenCreateUserDialog">
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">User Management</h1>
+    <button @onclick="OpenCreateUserDialog" 
+            class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+        </svg>
         Add User
-    </MudButton>
+    </button>
 </div>
 
-<MudCard Elevation="4">
-    <MudCardContent>
-        <MudTable Items="users" 
-                  Hover="true" 
-                  Dense="false" 
-                  Filter="new Func<UserInfo, bool>(FilterFunc)">
-            <ToolBarContent>
-                <MudText Typo="Typo.h6">Tenant Users</MudText>
-                <MudSpacer />
-                <MudTextField @bind-Value="searchString" 
-                              Placeholder="Search users..." 
-                              Adornment="Adornment.Start" 
-                              AdornmentIcon="Icons.Material.Filled.Search" 
-                              IconSize="Size.Medium" 
-                              Class="mt-0" />
-            </ToolBarContent>
-            <HeaderContent>
-                <MudTh>User</MudTh>
-                <MudTh>Email</MudTh>
-                <MudTh>Role</MudTh>
-                <MudTh>Status</MudTh>
-                <MudTh>Last Login</MudTh>
-                <MudTh>Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="User">
-                    <div class="d-flex align-center">
-                        <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="mr-3">
-                            @if (!string.IsNullOrEmpty(context.AvatarUrl))
-                            {
-                                <MudImage Src="@context.AvatarUrl" />
-                            }
-                            else
-                            {
-                                @context.FirstName.FirstOrDefault()@context.LastName.FirstOrDefault()
-                            }
-                        </MudAvatar>
-                        <div>
-                            <MudText Typo="Typo.body1">@context.FullName</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Joined @context.CreatedAt.ToString("MMM yyyy")
-                            </MudText>
+<div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-medium text-gray-900 dark:text-white">Tenant Users</h2>
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input @bind="searchString" 
+                       placeholder="Search users..." 
+                       class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white dark:bg-gray-700 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"/>
+            </div>
+        </div>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Login</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                @foreach(var user in users.Where(FilterFunc))
+                {
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10">
+                                @if (!string.IsNullOrEmpty(user.AvatarUrl))
+                                {
+                                    <img class="h-10 w-10 rounded-full" src="@user.AvatarUrl" alt="">
+                                }
+                                else
+                                {
+                                    <div class="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                                        @user.FirstName.FirstOrDefault()@user.LastName.FirstOrDefault()
+                                    </div>
+                                }
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900 dark:text-white">@user.FullName</div>
+                                <div class="text-sm text-gray-500 dark:text-gray-400">
+                                    Joined @user.CreatedAt.ToString("MMM yyyy")
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </MudTd>
-                <MudTd DataLabel="Email">@context.Email</MudTd>
-                <MudTd DataLabel="Role">
-                    <MudChip Size="Size.Small" Color="@GetRoleColor(context.Role)">
-                        @context.Role
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="Status">
-                    <MudChip Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
-                        @(context.IsActive ? "Active" : "Inactive")
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="Last Login">
-                    @if (context.LastLoginAt.HasValue)
-                    {
-                        <MudText Typo="Typo.body2">@context.LastLoginAt.Value.ToString("MMM dd, HH:mm")</MudText>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Never</MudText>
-                    }
-                </MudTd>
-                <MudTd DataLabel="Actions">
-                    <MudButtonGroup Size="Size.Small">
-                        <MudIconButton Icon="Icons.Material.Filled.Edit" 
-                                       Color="Color.Primary" 
-                                       Size="Size.Small"
-                                       OnClick="@(() => EditUser(context))"
-                                       Title="Edit User" />
-                        @if (context.IsActive)
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">@user.Email</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
+                                     @(GetRoleColor(user.Role) == "error" ? "bg-red-100 text-red-800 dark:bg-red-200 dark:text-red-900" :
+                                       GetRoleColor(user.Role) == "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-200 dark:text-yellow-900" :
+                                       GetRoleColor(user.Role) == "primary" ? "bg-blue-100 text-blue-800 dark:bg-blue-200 dark:text-blue-900" :
+                                       "bg-gray-100 text-gray-800 dark:bg-gray-200 dark:text-gray-900")">
+                            @user.Role
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
+                                     @(user.IsActive ? "bg-green-100 text-green-800 dark:bg-green-200 dark:text-green-900" : "bg-gray-100 text-gray-800 dark:bg-gray-200 dark:text-gray-900")">
+                            @(user.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        @if (user.LastLoginAt.HasValue)
                         {
-                            <MudIconButton Icon="Icons.Material.Filled.Block" 
-                                           Color="Color.Warning" 
-                                           Size="Size.Small"
-                                           OnClick="@(() => ToggleUserStatus(context))"
-                                           Title="Deactivate User" />
+                            @user.LastLoginAt.Value.ToString("MMM dd, HH:mm")
                         }
                         else
                         {
-                            <MudIconButton Icon="Icons.Material.Filled.CheckCircle" 
-                                           Color="Color.Success" 
-                                           Size="Size.Small"
-                                           OnClick="@(() => ToggleUserStatus(context))"
-                                           Title="Activate User" />
+                            <span class="text-gray-500 dark:text-gray-400">Never</span>
                         }
-                        <MudIconButton Icon="Icons.Material.Filled.Delete" 
-                                       Color="Color.Error" 
-                                       Size="Size.Small"
-                                       OnClick="@(() => DeleteUser(context))"
-                                       Title="Delete User" />
-                    </MudButtonGroup>
-                </MudTd>
-            </RowTemplate>
-            <PagerContent>
-                <MudTablePager />
-            </PagerContent>
-        </MudTable>
-    </MudCardContent>
-</MudCard>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex space-x-2">
+                            <button @onclick="@(() => EditUser(user))" 
+                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded"
+                                    title="Edit User">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </button>
+                            @if (user.IsActive)
+                            {
+                                <button @onclick="@(() => ToggleUserStatus(user))" 
+                                        class="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300 p-1 rounded"
+                                        title="Deactivate User">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"/>
+                                    </svg>
+                                </button>
+                            }
+                            else
+                            {
+                                <button @onclick="@(() => ToggleUserStatus(user))" 
+                                        class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 p-1 rounded"
+                                        title="Activate User">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </button>
+                            }
+                            <button @onclick="@(() => DeleteUser(user))" 
+                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 rounded"
+                                    title="Delete User">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<ConfirmationModal @ref="confirmationModal" OnResult="OnConfirmationResult" />
 
 @code {
     private List<UserInfo> users = new();
     private string searchString = "";
+    private ConfirmationModal confirmationModal = default!;
+    private UserInfo? pendingDeleteUser;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         // Mock data for demonstration
         users = new List<UserInfo>
@@ -131,6 +159,7 @@
             new() { Id = Guid.NewGuid(), FirstName = "John", LastName = "Doe", Email = "john@example.com", Role = "User", IsActive = true, CreatedAt = DateTime.UtcNow.AddDays(-15), LastLoginAt = DateTime.UtcNow.AddDays(-2) },
             new() { Id = Guid.NewGuid(), FirstName = "Jane", LastName = "Smith", Email = "jane@example.com", Role = "Manager", IsActive = false, CreatedAt = DateTime.UtcNow.AddDays(-10) }
         };
+        return Task.CompletedTask;
     }
 
     private bool FilterFunc(UserInfo user)
@@ -145,42 +174,49 @@
 
     private void OpenCreateUserDialog()
     {
-        Snackbar.Add("Create user dialog not yet implemented", Severity.Info);
+        Console.WriteLine("Notification");
     }
 
     private void EditUser(UserInfo user)
     {
-        Snackbar.Add($"Edit user '{user.FullName}' not yet implemented", Severity.Info);
+        Console.WriteLine("Notification");
     }
 
-    private async Task ToggleUserStatus(UserInfo user)
+    private Task ToggleUserStatus(UserInfo user)
     {
         user.IsActive = !user.IsActive;
         var action = user.IsActive ? "activated" : "deactivated";
-        Snackbar.Add($"User '{user.FullName}' {action} successfully", Severity.Success);
+        Console.WriteLine("Notification");
+        return Task.CompletedTask;
     }
 
-    private async Task DeleteUser(UserInfo user)
+    private void DeleteUser(UserInfo user)
     {
-        var result = await DialogService.ShowMessageBox(
-            "Delete User",
+        pendingDeleteUser = user;
+        confirmationModal.Show(
+            "Delete User", 
             $"Are you sure you want to delete '{user.FullName}'? This action cannot be undone.",
-            yesText: "Delete",
-            cancelText: "Cancel");
+            "Delete",
+            "Cancel"
+        );
+    }
 
-        if (result == true)
+    private void OnConfirmationResult(bool confirmed)
+    {
+        if (confirmed && pendingDeleteUser != null)
         {
-            users.Remove(user);
-            Snackbar.Add($"User '{user.FullName}' deleted successfully", Severity.Success);
+            users.Remove(pendingDeleteUser);
+            Console.WriteLine($"User '{pendingDeleteUser.FullName}' deleted successfully");
+            pendingDeleteUser = null;
         }
     }
 
-    private Color GetRoleColor(string role) => role switch
+    private string GetRoleColor(string role) => role switch
     {
-        "Admin" => Color.Error,
-        "Manager" => Color.Warning,
-        "User" => Color.Primary,
-        _ => Color.Default
+        "Admin" => "error",
+        "Manager" => "warning",
+        "User" => "primary",
+        _ => "default"
     };
 
     public class UserInfo
@@ -198,4 +234,4 @@
     }
 }
 
-@inject IDialogService DialogService
+

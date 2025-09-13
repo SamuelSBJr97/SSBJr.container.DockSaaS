@@ -70,6 +70,16 @@ Se não conseguir fazer login, tente:
 7. **Se ver erro "JSON deserialization error" para health endpoint, isso foi corrigido - atualize o código**
 8. **Execute o script de troubleshooting: `.\scripts\troubleshoot-login.ps1`**
 
+**⚠️ Troubleshooting de HttpRequestException:**
+Se estiver vendo múltiplas `HttpRequestException` nos logs:
+1. **Execute o diagnóstico completo**: `.\scripts\diagnose-connectivity.ps1`
+2. **Verifique se o Aspire está gerenciando os serviços** corretamente
+3. **Confirme as portas**: API (7000/5200), Web (7001/5201), Aspire (17090)
+4. **Teste certificados HTTPS**: `dotnet dev-certs https --trust`
+5. **Reinicie completamente**: Pare tudo e execute `dotnet run --project SSBJr.DockSaaS.AppHost`
+6. **Verifique service discovery**: `appsettings.Development.json` deve usar `"ApiBaseUrl": "http://apiservice"`
+7. **Monitore no Aspire Dashboard**: `https://localhost:17090`
+
 **⚠️ Troubleshooting do Dashboard (após login):**
 Se fizer login mas o dashboard não carregar ou não mostrar dados:
 1. **Verifique se está redirecionando**: Após login deve ir para `https://localhost:7001/`
@@ -399,6 +409,8 @@ dotnet test SSBJr.DockSaaS.Tests
 - `scripts/test-api-health.ps1`: Teste de conectividade da API
 - `scripts/test-kafka-integration.ps1`: Teste de integração Kafka
 - `scripts/test-dashboard-login.ps1`: Teste específico do login do dashboard
+- `scripts/diagnose-connectivity.ps1`: Diagnóstico completo de conectividade e HttpRequestException
+- `scripts/verify-login.ps1`: Verificação rápida do login com credenciais padrão
 
 ## 🔧 Requisitos Técnicos
 
@@ -479,6 +491,12 @@ dotnet test SSBJr.DockSaaS.Tests
 
 # Teste específico do dashboard
 .\scripts\test-dashboard-login.ps1
+
+# Diagnóstico completo de conectividade
+.\scripts\diagnose-connectivity.ps1
+
+# Verificação rápida do login
+.\scripts\verify-login.ps1
 ```
 
 ### Postman Testing

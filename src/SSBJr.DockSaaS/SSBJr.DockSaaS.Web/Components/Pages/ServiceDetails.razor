@@ -2,215 +2,232 @@
 @attribute [Authorize]
 @inject IServiceInstanceService ServiceInstanceService
 @inject IDashboardService DashboardService
-@inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@using SSBJr.DockSaaS.Web.Components.Shared
 
 <PageTitle>Service Details - DockSaaS</PageTitle>
 
 @if (isLoading)
 {
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+        <div class="bg-blue-600 h-2 rounded-full animate-pulse" style="width: 100%"></div>
+    </div>
 }
 else if (serviceInstance == null)
 {
-    <MudAlert Severity="Severity.Error" Class="mb-4">
-        Service not found or you don't have permission to view it.
-        <MudButton Href="/services" Color="Color.Primary" Variant="Variant.Text" Class="ml-2">
-            Back to Services
-        </MudButton>
-    </MudAlert>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">
+                    Service not found or you don't have permission to view it.
+                </h3>
+                <div class="mt-2">
+                    <a href="/services" class="text-sm bg-red-100 text-red-800 font-medium py-1.5 px-3 rounded-md hover:bg-red-200">
+                        Back to Services
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 }
 else
 {
-    <div class="d-flex align-center justify-space-between mb-4">
-        <div class="d-flex align-center">
-            <MudIconButton Icon="Icons.Material.Filled.ArrowBack" 
-                           Color="Color.Default" 
-                           OnClick="@(() => Navigation.NavigateTo("/services"))"
-                           Class="mr-2" />
-            <MudIcon Icon="@GetServiceIcon(serviceInstance.ServiceType)" Size="Size.Large" Class="mr-3" />
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center">
+            <button @onclick="@(() => Navigation.NavigateTo("/services"))"
+                    class="mr-3 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors">
+                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <div class="text-3xl mr-3">@GetServiceIcon(serviceInstance.ServiceType)</div>
             <div>
-                <MudText Typo="Typo.h3">@serviceInstance.Name</MudText>
-                <MudText Typo="Typo.body1" Color="Color.Secondary">@serviceInstance.ServiceDefinitionName</MudText>
+                <h3 class="text-2xl font-bold text-gray-900">@serviceInstance.Name</h3>
+                <p class="text-sm text-gray-600">@serviceInstance.ServiceDefinitionName</p>
             </div>
         </div>
-        <div class="d-flex gap-2">
+        <div class="flex space-x-3">
             @if (serviceInstance.Status == "Stopped")
             {
-                <MudButton Color="Color.Success" 
-                           Variant="Variant.Filled" 
-                           StartIcon="Icons.Material.Filled.PlayArrow"
-                           OnClick="StartService"
-                           Disabled="isUpdating">
+                <button @onclick="StartService"
+                        disabled="@isUpdating"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                    </svg>
                     Start Service
-                </MudButton>
+                </button>
             }
             else if (serviceInstance.Status == "Running")
             {
-                <MudButton Color="Color.Warning" 
-                           Variant="Variant.Filled" 
-                           StartIcon="Icons.Material.Filled.Stop"
-                           OnClick="StopService"
-                           Disabled="isUpdating">
+                <button @onclick="StopService"
+                        disabled="@isUpdating"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
+                    </svg>
                     Stop Service
-                </MudButton>
+                </button>
             }
-            <MudButton Color="Color.Error" 
-                       Variant="Variant.Outlined" 
-                       StartIcon="Icons.Material.Filled.Delete"
-                       OnClick="DeleteService"
-                       Disabled="isUpdating">
+            <button @onclick="DeleteService"
+                    disabled="@isUpdating"
+                    class="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd" />
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414L7.586 12l-1.293 1.293a1 1 0 001.414 1.414L9 13.414l1.293 1.293a1 1 0 001.414-1.414L10.414 12l1.293-1.293z" clip-rule="evenodd" />
+                </svg>
                 Delete
-            </MudButton>
+            </button>
         </div>
     </div>
 
-    <MudGrid>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Service Overview -->
-        <MudItem xs="12" md="8">
-            <MudCard Elevation="4" Class="mb-4">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Service Overview</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudGrid>
-                        <MudItem xs="12" sm="6">
-                            <MudField Label="Status" Variant="Variant.Text" Class="mb-3">
-                                <MudChip Color="@GetStatusColor(serviceInstance.Status)" Size="Size.Medium">
-                                    @serviceInstance.Status
-                                </MudChip>
-                            </MudField>
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudField Label="Service Type" Variant="Variant.Text" Class="mb-3">
-                                @serviceInstance.ServiceType
-                            </MudField>
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudField Label="Created" Variant="Variant.Text" Class="mb-3">
-                                @serviceInstance.CreatedAt.ToString("MMM dd, yyyy HH:mm")
-                            </MudField>
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudField Label="Last Updated" Variant="Variant.Text" Class="mb-3">
-                                @serviceInstance.UpdatedAt.ToString("MMM dd, yyyy HH:mm")
-                            </MudField>
-                        </MudItem>
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-lg shadow-lg mb-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h6 class="text-lg font-semibold text-gray-900">Service Overview</h6>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <span class="@GetStatusChipClasses(serviceInstance.Status) inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
+                                @serviceInstance.Status
+                            </span>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
+                            <p class="text-sm text-gray-900">@serviceInstance.ServiceType</p>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Created</label>
+                            <p class="text-sm text-gray-900">@serviceInstance.CreatedAt.ToString("MMM dd, yyyy HH:mm")</p>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Last Updated</label>
+                            <p class="text-sm text-gray-900">@serviceInstance.UpdatedAt.ToString("MMM dd, yyyy HH:mm")</p>
+                        </div>
                         @if (!string.IsNullOrEmpty(serviceInstance.EndpointUrl))
                         {
-                            <MudItem xs="12">
-                                <MudField Label="Endpoint URL" Variant="Variant.Text" Class="mb-3">
-                                    <MudLink Href="@serviceInstance.EndpointUrl" Target="_blank">
-                                        @serviceInstance.EndpointUrl
-                                    </MudLink>
-                                </MudField>
-                            </MudItem>
+                            <div class="sm:col-span-2 mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Endpoint URL</label>
+                                <a href="@serviceInstance.EndpointUrl" target="_blank" class="text-blue-600 hover:text-blue-800 underline">
+                                    @serviceInstance.EndpointUrl
+                                </a>
+                            </div>
                         }
                         @if (!string.IsNullOrEmpty(serviceInstance.ApiKey))
                         {
-                            <MudItem xs="12">
-                                <MudField Label="API Key" Variant="Variant.Text" Class="mb-3">
-                                    <div class="d-flex align-center">
-                                        <MudTextField Value="@(showApiKey ? serviceInstance.ApiKey : "ïïïïïïïïïïïïïïïïïïïïïïïïïïïïïïïï")"
-                                                      ReadOnly="true"
-                                                      Variant="Variant.Outlined"
-                                                      Class="flex-grow-1 mr-2" />
-                                        <MudIconButton Icon="@(showApiKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                                                       OnClick="ToggleApiKeyVisibility"
-                                                       Title="Toggle API Key Visibility" />
-                                        <MudIconButton Icon="Icons.Material.Filled.ContentCopy"
-                                                       OnClick="CopyApiKey"
-                                                       Title="Copy API Key" />
-                                    </div>
-                                </MudField>
-                            </MudItem>
+                            <div class="sm:col-span-2 mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="text" 
+                                           value="@(showApiKey ? serviceInstance.ApiKey : "‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà‚ñà")"
+                                           readonly
+                                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50" />
+                                    <button @onclick="ToggleApiKeyVisibility"
+                                            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                                            title="Toggle API Key Visibility">
+                                        @(showApiKey ? "üëÅÔ∏è‚Äçüó®Ô∏è" : "üëÅÔ∏è")
+                                    </button>
+                                    <button @onclick="CopyApiKey"
+                                            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                                            title="Copy API Key">
+                                        üìã
+                                    </button>
+                                </div>
+                            </div>
                         }
-                    </MudGrid>
-                </MudCardContent>
-            </MudCard>
+                    </div>
+                </div>
+            </div>
 
             <!-- Usage Statistics -->
-            <MudCard Elevation="4" Class="mb-4">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Usage Statistics</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
+            <div class="bg-white rounded-lg shadow-lg mb-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h6 class="text-lg font-semibold text-gray-900">Usage Statistics</h6>
+                </div>
+                <div class="p-6">
                     @if (serviceInstance.UsageQuota > 0)
                     {
                         var usagePercent = (double)serviceInstance.CurrentUsage / serviceInstance.UsageQuota * 100;
                         <div class="mb-4">
-                            <div class="d-flex justify-space-between mb-2">
-                                <MudText Typo="Typo.body1">Storage Usage</MudText>
-                                <MudText Typo="Typo.body2">@FormatBytes(serviceInstance.CurrentUsage) / @FormatBytes(serviceInstance.UsageQuota)</MudText>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm font-medium text-gray-700">Storage Usage</span>
+                                <span class="text-sm text-gray-500">@FormatBytes(serviceInstance.CurrentUsage) / @FormatBytes(serviceInstance.UsageQuota)</span>
                             </div>
-                            <MudProgressLinear Value="usagePercent" Color="@GetUsageColor(usagePercent)" />
-                            <MudText Typo="Typo.caption" Class="mt-1">@usagePercent.ToString("F1")% used</MudText>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="@GetUsageBarClasses(usagePercent) h-2 rounded-full" style="width: @usagePercent.ToString("F1")%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">@usagePercent.ToString("F1")% used</p>
                         </div>
                     }
                     else
                     {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        <p class="text-sm text-gray-500">
                             Current Usage: @FormatBytes(serviceInstance.CurrentUsage) (No limit set)
-                        </MudText>
+                        </p>
                     }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
+                </div>
+            </div>
+        </div>
 
         <!-- Service Metrics -->
-        <MudItem xs="12" md="4">
-            <MudCard Elevation="4" Class="mb-4">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Recent Metrics</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
+        <div>
+            <div class="bg-white rounded-lg shadow-lg mb-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h6 class="text-lg font-semibold text-gray-900">Recent Metrics</h6>
+                </div>
+                <div class="p-6">
                     @if (metrics.Any())
                     {
                         @foreach (var metricGroup in metrics.GroupBy(m => m.MetricName).Take(5))
                         {
                             var latestMetric = metricGroup.OrderByDescending(m => m.Timestamp).First();
                             <div class="mb-3">
-                                <div class="d-flex justify-space-between">
-                                    <MudText Typo="Typo.body2">@FormatMetricName(latestMetric.MetricName)</MudText>
-                                    <MudText Typo="Typo.body2">@latestMetric.Value.ToString("F2") @latestMetric.Unit</MudText>
+                                <div class="flex justify-between">
+                                    <span class="text-sm text-gray-700">@FormatMetricName(latestMetric.MetricName)</span>
+                                    <span class="text-sm font-medium text-gray-900">@latestMetric.Value.ToString("F2") @latestMetric.Unit</span>
                                 </div>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <p class="text-xs text-gray-500">
                                     @latestMetric.Timestamp.ToString("HH:mm:ss")
-                                </MudText>
+                                </p>
                             </div>
                         }
                     }
                     else
                     {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">No metrics available</MudText>
+                        <p class="text-sm text-gray-500">No metrics available</p>
                     }
-                </MudCardContent>
-            </MudCard>
+                </div>
+            </div>
 
             <!-- Configuration -->
-            <MudCard Elevation="4">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Configuration</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudExpansionPanels>
-                        <MudExpansionPanel Text="View Configuration">
-                            <pre style="white-space: pre-wrap; word-break: break-word;">@FormatJson(serviceInstance.Configuration)</pre>
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
+            <div class="bg-white rounded-lg shadow-lg">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h6 class="text-lg font-semibold text-gray-900">Configuration</h6>
+                </div>
+                <div class="p-6">
+                    <details class="bg-gray-50 rounded-lg p-4">
+                        <summary class="font-medium text-gray-900 cursor-pointer">View Configuration</summary>
+                        <div class="mt-4">
+                            <pre class="text-xs text-gray-700 whitespace-pre-wrap break-words">@FormatJson(serviceInstance.Configuration)</pre>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </div>
 }
+
+<!-- Confirmation Modal -->
+<ConfirmationModal @ref="confirmationModal" OnResult="OnConfirmationResult" />
 
 @code {
     [Parameter] public Guid ServiceId { get; set; }
@@ -220,6 +237,7 @@ else
     private bool showApiKey = false;
     private ServiceInstanceDto? serviceInstance;
     private List<ServiceMetricDto> metrics = new();
+    private ConfirmationModal confirmationModal = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -237,9 +255,9 @@ else
                 metrics = await ServiceInstanceService.GetServiceInstanceMetricsAsync(ServiceId, DateTime.UtcNow.AddHours(-1));
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Snackbar.Add($"Failed to load service details: {ex.Message}", Severity.Error);
+            Console.WriteLine("Notification");
         }
         finally
         {
@@ -255,12 +273,12 @@ else
             var result = await ServiceInstanceService.StartServiceInstanceAsync(ServiceId);
             if (result)
             {
-                Snackbar.Add("Service started successfully", Severity.Success);
+                Console.WriteLine("Notification");
                 await LoadServiceDetails();
             }
             else
             {
-                Snackbar.Add("Failed to start service", Severity.Error);
+                Console.WriteLine("Notification");
             }
         }
         finally
@@ -277,12 +295,12 @@ else
             var result = await ServiceInstanceService.StopServiceInstanceAsync(ServiceId);
             if (result)
             {
-                Snackbar.Add("Service stopped successfully", Severity.Success);
+                Console.WriteLine("Notification");
                 await LoadServiceDetails();
             }
             else
             {
-                Snackbar.Add("Failed to stop service", Severity.Error);
+                Console.WriteLine("Notification");
             }
         }
         finally
@@ -291,27 +309,31 @@ else
         }
     }
 
-    private async Task DeleteService()
+    private void DeleteService()
     {
         if (serviceInstance == null) return;
 
-        var result = await DialogService.ShowMessageBox(
-            "Delete Service",
+        confirmationModal.Show(
+            "Delete Service", 
             $"Are you sure you want to delete '{serviceInstance.Name}'? This action cannot be undone.",
-            yesText: "Delete",
-            cancelText: "Cancel");
+            "Delete",
+            "Cancel"
+        );
+    }
 
-        if (result == true)
+    private async Task OnConfirmationResult(bool confirmed)
+    {
+        if (confirmed)
         {
             var deleteResult = await ServiceInstanceService.DeleteServiceInstanceAsync(ServiceId);
             if (deleteResult)
             {
-                Snackbar.Add($"Service '{serviceInstance.Name}' deleted successfully", Severity.Success);
+                Console.WriteLine($"Service '{serviceInstance?.Name}' deleted successfully");
                 Navigation.NavigateTo("/services");
             }
             else
             {
-                Snackbar.Add("Failed to delete service", Severity.Error);
+                Console.WriteLine("Failed to delete service");
             }
         }
     }
@@ -321,39 +343,40 @@ else
         showApiKey = !showApiKey;
     }
 
-    private async Task CopyApiKey()
+    private Task CopyApiKey()
     {
         if (serviceInstance?.ApiKey != null)
         {
             // In a real application, you would use JSInterop to copy to clipboard
-            Snackbar.Add("API Key copied to clipboard", Severity.Success);
+            Console.WriteLine("Notification");
         }
+        return Task.CompletedTask;
     }
 
     private string GetServiceIcon(string serviceType) => serviceType switch
     {
-        "S3Storage" => Icons.Material.Filled.Storage,
-        "RDSDatabase" => Icons.Material.Filled.Storage,
-        "NoSQLDatabase" => Icons.Material.Filled.TableChart,
-        "Queue" => Icons.Material.Filled.Queue,
-        "Function" => Icons.Material.Filled.Functions,
-        _ => Icons.Material.Filled.Cloud
+        "S3Storage" => "üíæ",
+        "RDSDatabase" => "üóÑÔ∏è",
+        "NoSQLDatabase" => "üìä",
+        "Queue" => "üìã",
+        "Function" => "‚ö°",
+        _ => "‚òÅÔ∏è"
     };
 
-    private Color GetStatusColor(string status) => status switch
+    private string GetStatusChipClasses(string status) => status switch
     {
-        "Running" => Color.Success,
-        "Stopped" => Color.Default,
-        "Error" => Color.Error,
-        "Created" => Color.Info,
-        _ => Color.Default
+        "Running" => "bg-green-100 text-green-800",
+        "Stopped" => "bg-gray-100 text-gray-800",
+        "Error" => "bg-red-100 text-red-800",
+        "Created" => "bg-blue-100 text-blue-800",
+        _ => "bg-gray-100 text-gray-800"
     };
 
-    private Color GetUsageColor(double percentage) => percentage switch
+    private string GetUsageBarClasses(double percentage) => percentage switch
     {
-        var x when x < 70 => Color.Success,
-        var x when x < 90 => Color.Warning,
-        _ => Color.Error
+        var x when x < 70 => "bg-green-500",
+        var x when x < 90 => "bg-yellow-500",
+        _ => "bg-red-500"
     };
 
     private string FormatBytes(long bytes)
@@ -371,9 +394,9 @@ else
 
     private string FormatMetricName(string metricName)
     {
-        return System.Text.RegularExpressions.Regex.Replace(metricName, "(\\B[A-Z])", " $1")
-            .Replace("_", " ")
-            .ToTitleCase();
+        var formatted = System.Text.RegularExpressions.Regex.Replace(metricName, "(\\B[A-Z])", " $1")
+            .Replace("_", " ");
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(formatted.ToLower());
     }
 
     private string FormatJson(string json)
@@ -390,5 +413,4 @@ else
     }
 }
 
-@inject IDialogService DialogService
 @using System.Text.Json

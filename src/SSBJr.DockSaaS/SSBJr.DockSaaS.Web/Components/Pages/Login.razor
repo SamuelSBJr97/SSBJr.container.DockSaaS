@@ -1,147 +1,148 @@
 @page "/login"
 @inject IAuthService AuthService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ApiClient ApiClient
 @inject ILogger<Login> Logger
+@inject IJSRuntime JSRuntime
 
-<MudContainer Component="main" MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center mud-height-full">
-    <MudPaper Elevation="25" Class="pa-8" Style="width: 100%; max-width: 400px;">
-        <MudForm @ref="form" @bind-IsValid="@success">
-            <div class="d-flex align-center justify-center mb-6">
-                <MudText Typo="Typo.h4" Color="Color.Primary">DockSaaS</MudText>
-            </div>
-            
-            <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">
-                @(isRegister ? "Create Account" : "Sign In")
-            </MudText>
+<main class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div class="bg-white p-8 rounded-lg shadow-lg">
+            <form @onsubmit="HandleSubmit" @onsubmit:preventDefault="true">
+                <div class="text-center mb-6">
+                    <h1 class="text-3xl font-bold text-blue-600">DockSaaS</h1>
+                </div>
+                
+                <div class="text-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">
+                        @(isRegister ? "Create Account" : "Sign In")
+                    </h2>
+                </div>
 
-            @if (!string.IsNullOrEmpty(apiConnectionStatus))
-            {
-                <MudAlert Severity="@(apiConnectionStatus.Contains("?") ? Severity.Success : Severity.Warning)" Class="mb-3">
-                    @apiConnectionStatus
-                </MudAlert>
-            }
-
-            @if (isRegister)
-            {
-                <MudTextField @bind-Value="registerRequest.FirstName"
-                              For="@(() => registerRequest.FirstName)"
-                              Label="First Name"
-                              Variant="Variant.Outlined"
-                              Required="true"
-                              Class="mb-3" />
-
-                <MudTextField @bind-Value="registerRequest.LastName"
-                              For="@(() => registerRequest.LastName)"
-                              Label="Last Name"
-                              Variant="Variant.Outlined"
-                              Required="true"
-                              Class="mb-3" />
-
-                <MudTextField @bind-Value="registerRequest.TenantName"
-                              For="@(() => registerRequest.TenantName)"
-                              Label="Company/Tenant Name"
-                              Variant="Variant.Outlined"
-                              Required="true"
-                              Class="mb-3" />
-
-                <MudTextField @bind-Value="registerRequest.Email"
-                              For="@(() => registerRequest.Email)"
-                              Label="Email"
-                              Variant="Variant.Outlined"
-                              InputType="InputType.Email"
-                              Required="true"
-                              Class="mb-3" />
-
-                <MudTextField @bind-Value="registerRequest.Password"
-                              For="@(() => registerRequest.Password)"
-                              Label="Password"
-                              Variant="Variant.Outlined"
-                              InputType="InputType.Password"
-                              Required="true"
-                              Class="mb-3" />
-            }
-            else
-            {
-                <MudTextField @bind-Value="loginRequest.Email"
-                              For="@(() => loginRequest.Email)"
-                              Label="Email"
-                              Variant="Variant.Outlined"
-                              InputType="InputType.Email"
-                              Required="true"
-                              Class="mb-3" />
-
-                <MudTextField @bind-Value="loginRequest.Password"
-                              For="@(() => loginRequest.Password)"
-                              Label="Password"
-                              Variant="Variant.Outlined"
-                              InputType="InputType.Password"
-                              Required="true"
-                              Class="mb-3" />
-
-                <MudTextField @bind-Value="loginRequest.TenantName"
-                              For="@(() => loginRequest.TenantName)"
-                              Label="Tenant Name (Optional)"
-                              Variant="Variant.Outlined"
-                              Class="mb-3"
-                              HelperText="Leave empty to use default tenant" />
-            }
-
-            @if (!isRegister)
-            {
-                <MudButton Variant="Variant.Text" 
-                           Size="Size.Small" 
-                           OnClick="PopulateDefaultCredentials"
-                           Class="mb-3">
-                    Use Default Admin Credentials
-                </MudButton>
-            }
-
-            <MudButton ButtonType="ButtonType.Submit"
-                       Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Size="Size.Large"
-                       FullWidth="true"
-                       Class="mb-3"
-                       OnClick="HandleSubmit"
-                       Disabled="isLoading">
-                @if (isLoading)
+                @if (!string.IsNullOrEmpty(apiConnectionStatus))
                 {
-                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                    <MudText Class="ms-2">@(isRegister ? "Creating Account..." : "Signing In...")</MudText>
+                    <div class="mb-3 p-3 rounded @(apiConnectionStatus.Contains("✓") ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700")">
+                        @apiConnectionStatus
+                    </div>
+                }
+
+                @if (isRegister)
+                {
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                        <input @bind="registerRequest.FirstName" 
+                               type="text" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                        <input @bind="registerRequest.LastName" 
+                               type="text" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Company/Tenant Name</label>
+                        <input @bind="registerRequest.TenantName" 
+                               type="text" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input @bind="registerRequest.Email" 
+                               type="email" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input @bind="registerRequest.Password" 
+                               type="password" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
                 }
                 else
                 {
-                    @(isRegister ? "Create Account" : "Sign In")
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input @bind="loginRequest.Email" 
+                               type="email" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input @bind="loginRequest.Password" 
+                               type="password" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tenant Name (Optional)</label>
+                        <input @bind="loginRequest.TenantName" 
+                               type="text"
+                               placeholder="Leave empty to use default tenant"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
                 }
-            </MudButton>
 
-            <MudDivider Class="mb-3" />
+                @if (!isRegister)
+                {
+                    <button type="button" 
+                            @onclick="PopulateDefaultCredentials"
+                            class="mb-3 text-sm text-blue-600 hover:text-blue-800 underline">
+                        Use Default Admin Credentials
+                    </button>
+                }
 
-            <MudButton Variant="Variant.Text"
-                       Color="Color.Primary"
-                       FullWidth="true"
-                       OnClick="ToggleMode">
-                @(isRegister ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
-            </MudButton>
+                <button type="submit"
+                        disabled="@isLoading"
+                        class="w-full mb-3 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    @if (isLoading)
+                    {
+                        <span class="flex items-center justify-center">
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            @(isRegister ? "Creating Account..." : "Signing In...")
+                        </span>
+                    }
+                    else
+                    {
+                        @(isRegister ? "Create Account" : "Sign In")
+                    }
+                </button>
 
-            <MudButton Variant="Variant.Text"
-                       Color="Color.Secondary"
-                       Size="Size.Small"
-                       FullWidth="true"
-                       OnClick="TestApiConnection"
-                       Class="mt-2">
-                Test API Connection
-            </MudButton>
-        </MudForm>
-    </MudPaper>
-</MudContainer>
+                <hr class="mb-3" />
+
+                <button type="button"
+                        @onclick="ToggleMode"
+                        class="w-full text-blue-600 hover:text-blue-800 py-2 px-4 border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    @(isRegister ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
+                </button>
+
+                <button type="button"
+                        @onclick="TestApiConnection"
+                        class="w-full mt-2 text-gray-600 hover:text-gray-800 py-2 px-4 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                    Test API Connection
+                </button>
+            </form>
+        </div>
+    </div>
+</main>
 
 @code {
-    private MudForm form = null!;
-    private bool success = false;
     private bool isLoading = false;
     private bool isRegister = false;
     private string apiConnectionStatus = "";
@@ -170,7 +171,7 @@
         loginRequest.TenantName = "";
         
         Logger.LogInformation("Default credentials populated");
-        Snackbar.Add("Default admin credentials loaded", Severity.Info);
+        Console.WriteLine("Notification");
     }
 
     private async Task TestApiConnection()
@@ -206,8 +207,6 @@
 
     private async Task HandleSubmit()
     {
-        if (!success) return;
-
         isLoading = true;
         bool result = false;
 
@@ -220,7 +219,7 @@
                 result = await AuthService.RegisterAsync(registerRequest);
                 if (result)
                 {
-                    Snackbar.Add("Account created successfully! Welcome to DockSaaS.", Severity.Success);
+                    Console.WriteLine("Notification");
                     Logger.LogInformation("Registration successful for user {Email}", registerRequest.Email);
                     
                     // Wait a moment for the auth state to be processed
@@ -242,7 +241,7 @@
                 }
                 else
                 {
-                    Snackbar.Add("Registration failed. Please check your information and try again.", Severity.Error);
+                    Console.WriteLine("Notification");
                     Logger.LogWarning("Registration failed for user {Email}", registerRequest.Email);
                 }
             }
@@ -251,7 +250,7 @@
                 result = await AuthService.LoginAsync(loginRequest);
                 if (result)
                 {
-                    Snackbar.Add("Welcome back!", Severity.Success);
+                    Console.WriteLine("Notification");
                     Logger.LogInformation("Login successful for user {Email}", loginRequest.Email);
                     
                     // Wait a moment for the auth state to be processed
@@ -273,7 +272,7 @@
                 }
                 else
                 {
-                    Snackbar.Add("Login failed. Please check your credentials and try again.", Severity.Error);
+                    Console.WriteLine("Notification");
                     Logger.LogWarning("Login failed for user {Email}", loginRequest.Email);
                     
                     // Test API connection again if login fails
@@ -284,7 +283,7 @@
         catch (Exception ex)
         {
             var errorMessage = $"An error occurred: {ex.Message}";
-            Snackbar.Add(errorMessage, Severity.Error);
+            Console.WriteLine("Notification");
             Logger.LogError(ex, "Error during {Action}", isRegister ? "registration" : "login");
             
             // Test API connection again if there's an exception

@@ -2,66 +2,133 @@
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
 @inject IAuthService AuthService
-@inject ISnackbar Snackbar
 
-<MudThemeProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
-
-<MudLayout>
-    <MudAppBar Elevation="1">
+<div class="page-layout">
+    <!-- Header moderno -->
+    <header class="page-header flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <AuthorizeView>
+                <Authorized>
+                    <button @onclick="DrawerToggle" 
+                            class="btn btn-ghost p-2 rounded-lg hover:bg-gray-100 focus:ring-2 focus:ring-primary-500 lg:hidden">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/" class="flex items-center gap-2 text-primary-600 hover:text-primary-700">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M3 13h1v7c0 1.103.897 2 2 2h12c1.103 0 2-.897 2-2v-7h1a1 1 0 0 0 .707-1.707L12 2.586 2.293 11.293A1 1 0 0 0 3 13z"/>
+                        </svg>
+                    </a>
+                </NotAuthorized>
+            </AuthorizeView>
+            
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl font-bold text-gradient-primary">DockSaaS</h1>
+                <span class="badge badge-primary text-xs">Cloud Platform</span>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4">
+            <AuthorizeView>
+                <Authorized>
+                    <!-- Notificações -->
+                    <button class="btn btn-ghost p-2 relative">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                        </svg>
+                        <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs"></span>
+                    </button>
+                    
+                    <!-- Menu do usuário -->
+                    <div class="relative">
+                        <button @onclick="ToggleUserMenu" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 focus:ring-2 focus:ring-primary-500 transition-all duration-200">
+                            <div class="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                @(context.User.Identity?.Name?.FirstOrDefault().ToString().ToUpper() ?? "U")
+                            </div>
+                            <span class="hidden md:block text-sm font-medium text-gray-700">@context.User.Identity?.Name</span>
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        
+                        @if (showUserMenu)
+                        {
+                            <div class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                                <div class="px-4 py-2 text-sm text-gray-500 border-b border-gray-100">
+                                    @context.User.Identity?.Name
+                                </div>
+                                <button @onclick="Logout" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                    <div class="flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                        </svg>
+                                        Logout
+                                    </div>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <div class="flex items-center gap-2">
+                        <a href="/welcome" class="btn btn-ghost text-sm">About</a>
+                        <a href="/login" class="btn btn-primary text-sm">Login</a>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </header>
+    
+    <div class="flex flex-1 min-h-0">
+        <!-- Sidebar moderna -->
         <AuthorizeView>
             <Authorized>
-                <MudIconButton Icon="Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="@((e) => DrawerToggle())" />
+                <aside class="sidebar w-64 h-full overflow-y-auto scrollbar-modern @(_drawerOpen ? "block" : "hidden") lg:block">
+                    <div class="p-4">
+                        <div class="mb-6">
+                            <h2 class="text-lg font-semibold text-gray-900 mb-1">Cloud Services</h2>
+                            <p class="text-sm text-gray-500">Manage your infrastructure</p>
+                        </div>
+                        <NavMenu />
+                    </div>
+                </aside>
             </Authorized>
-            <NotAuthorized>
-                <MudIconButton Icon="Icons.Material.Filled.Cloud" Color="Color.Inherit" Href="/" />
-            </NotAuthorized>
         </AuthorizeView>
-        <MudSpacer />
-        <MudText Typo="Typo.h6">DockSaaS</MudText>
-        <MudSpacer />
-        <AuthorizeView>
-            <Authorized>
-                <MudMenu Icon="Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopRight">
-                    <MudMenuItem>@context.User.Identity?.Name</MudMenuItem>
-                    <MudDivider />
-                    <MudMenuItem OnClick="Logout">Logout</MudMenuItem>
-                </MudMenu>
-            </Authorized>
-            <NotAuthorized>
-                <MudButtonGroup Color="Color.Inherit" Variant="Variant.Text">
-                    <MudButton Href="/welcome">About</MudButton>
-                    <MudButton Href="/login">Login</MudButton>
-                </MudButtonGroup>
-            </NotAuthorized>
-        </AuthorizeView>
-    </MudAppBar>
-    
-    <AuthorizeView>
-        <Authorized>
-            <MudDrawer @bind-Open="_drawerOpen" Elevation="2">
-                <MudDrawerHeader>
-                    <MudText Typo="Typo.h6">DockSaaS</MudText>
-                </MudDrawerHeader>
-                <NavMenu />
-            </MudDrawer>
-        </Authorized>
-    </AuthorizeView>
-    
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-            @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+        
+        <!-- Área de conteúdo principal -->
+        <main class="page-content flex-1 overflow-y-auto scrollbar-modern">
+            <div class="container-lg">
+                @Body
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Overlay para mobile quando sidebar está aberta -->
+<AuthorizeView>
+    <Authorized>
+        @if (_drawerOpen)
+        {
+            <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden" @onclick="DrawerToggle"></div>
+        }
+    </Authorized>
+</AuthorizeView>
 
 @code {
-    bool _drawerOpen = true;
+    bool _drawerOpen = false; // Fechado por padrão no mobile
+    bool showUserMenu = false;
 
     void DrawerToggle()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    void ToggleUserMenu()
+    {
+        showUserMenu = !showUserMenu;
     }
 
     private async Task Logout()
@@ -69,12 +136,20 @@
         try
         {
             await AuthService.LogoutAsync();
-            Snackbar.Add("Logged out successfully", Severity.Success);
+            // TODO: Add toast notification here
             Navigation.NavigateTo("/welcome", true);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error during logout: {ex.Message}", Severity.Error);
+            // TODO: Add error notification here
+            Console.WriteLine($"Error during logout: {ex.Message}");
+            Navigation.NavigateTo("/welcome", true);
         }
+    }
+
+    protected override void OnInitialized()
+    {
+        // Sidebar aberta por padrão em desktop
+        _drawerOpen = false;
     }
 }

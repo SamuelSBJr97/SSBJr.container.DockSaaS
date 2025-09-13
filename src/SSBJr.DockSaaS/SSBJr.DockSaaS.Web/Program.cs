@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Components.Authorization;
-using MudBlazor.Services;
 using SSBJr.DockSaaS.Web.Services;
 using SSBJr.DockSaaS.Web.Components;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -17,9 +16,6 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add MudBlazor services
-builder.Services.AddMudServices();
-
 // Configure authentication
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthentication("Cookies")
@@ -34,40 +30,17 @@ builder.Services.AddScoped<CustomAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(provider =>
     provider.GetRequiredService<CustomAuthenticationStateProvider>());
 
-// Add HTTP client for API communication with improved configuration
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7000";
+// Configure HTTP client for API communication with Aspire service discovery
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://apiservice";
+var fallbackApiUrl = "https://localhost:7000";
 
-// Try to get API service reference from Aspire if available
-if (builder.Environment.IsDevelopment())
+// Add HTTP client with Aspire service discovery
+builder.Services.AddHttpClient<ApiClient>(client =>
 {
-    try
-    {
-        // This will work if running under Aspire
-        builder.Services.AddHttpClient<ApiClient>("apiservice", client =>
-        {
-            // Default fallback configuration
-            client.BaseAddress = new Uri(apiBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(30);
-        });
-    }
-    catch
-    {
-        // Fallback to direct configuration
-        builder.Services.AddHttpClient<ApiClient>(client =>
-        {
-            client.BaseAddress = new Uri(apiBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(30);
-        });
-    }
-}
-else
-{
-    builder.Services.AddHttpClient<ApiClient>(client =>
-    {
-        client.BaseAddress = new Uri(apiBaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(30);
-    });
-}
+    client.BaseAddress = new Uri(apiBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.Add("User-Agent", "DockSaaS-Web/1.0");
+});
 
 // Add local storage
 builder.Services.AddBlazoredLocalStorage(config =>
@@ -113,5 +86,11 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
 });
+
+// Log startup information
+app.Logger.LogInformation("DockSaaS Web application started");
+app.Logger.LogInformation("API Base URL configured as: {ApiBaseUrl}", apiBaseUrl);
+app.Logger.LogInformation("Fallback API URL: {FallbackApiUrl}", fallbackApiUrl);
+app.Logger.LogInformation("Environment: {Environment}", app.Environment.EnvironmentName);
 
 app.Run();
