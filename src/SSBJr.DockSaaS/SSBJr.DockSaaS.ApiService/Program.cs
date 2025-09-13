@@ -92,6 +92,9 @@ builder.Services.AddScoped<IServiceManager, ServiceManager>();
 builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<IServiceProvisioningService, ServiceProvisioningService>();
 
+// Register Kafka service
+builder.Services.AddSingleton<IKafkaManagementService, KafkaManagementService>();
+
 // Register service providers
 builder.Services.AddScoped<SSBJr.DockSaaS.ApiService.Services.IServiceProvider, S3StorageServiceProvider>();
 builder.Services.AddScoped<SSBJr.DockSaaS.ApiService.Services.IServiceProvider, RDSDatabaseServiceProvider>();
@@ -220,6 +223,9 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Note: Health checks are already mapped by MapDefaultEndpoints() above from Aspire service defaults
+// No need to add duplicate health check mappings
+
 // Ensure database is created and seeded
 await using (var scope = app.Services.CreateAsyncScope())
 {
@@ -304,6 +310,31 @@ await using (var scope = app.Services.CreateAsyncScope())
                 await Task.Delay(retryDelay);
             }
         }
+    }
+}
+
+// Test Kafka connection on startup
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var kafkaService = scope.ServiceProvider.GetRequiredService<IKafkaManagementService>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    
+    try
+    {
+        logger.LogInformation("Testing Kafka connection...");
+        var isConnected = await kafkaService.TestConnectionAsync();
+        if (isConnected)
+        {
+            logger.LogInformation("? Kafka connection successful");
+        }
+        else
+        {
+            logger.LogWarning("??  Kafka connection failed - Kafka features may not work properly");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "? Error testing Kafka connection");
     }
 }
 
@@ -511,9 +542,9 @@ static async Task SeedServiceDefinitionsAsync(DockSaaSDbContext context)
                     "compressionType": { "type": "string", "enum": ["none", "gzip", "snappy", "lz4", "zstd"], "default": "snappy" },
                     "cleanupPolicy": { "type": "string", "enum": ["delete", "compact"], "default": "delete" },
                     "maxMessageBytes": { "type": "integer", "default": 1048576, "minimum": 1024, "maximum": 104857600 },
-                    "securityProtocol": { "type": "string", "enum": ["PLAINTEXT", "SASL_PLAINTEXT", "SASL_SSL", "SSL"], "default": "SASL_SSL" },
+                    "securityProtocol": { "type": "string", "enum": ["PLAINTEXT", "SASL_PLAINTEXT", "SASL_SSL", "SSL"], "default": "PLAINTEXT" },
                     "saslMechanism": { "type": "string", "enum": ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"], "default": "PLAIN" },
-                    "enableSchemaRegistry": { "type": "boolean", "default": true },
+                    "enableSchemaRegistry": { "type": "boolean", "default": false },
                     "enableKafkaConnect": { "type": "boolean", "default": false }
                 }
                 """,
@@ -525,9 +556,9 @@ static async Task SeedServiceDefinitionsAsync(DockSaaSDbContext context)
                     "compressionType": "snappy",
                     "cleanupPolicy": "delete",
                     "maxMessageBytes": 1048576,
-                    "securityProtocol": "SASL_SSL",
+                    "securityProtocol": "PLAINTEXT",
                     "saslMechanism": "PLAIN",
-                    "enableSchemaRegistry": true,
+                    "enableSchemaRegistry": false,
                     "enableKafkaConnect": false
                 }
                 """,

@@ -14,10 +14,16 @@ var redis = builder.AddRedis("redis")
     .WithDataVolume()
     .WithRedisCommander();
 
+// Add Apache Kafka
+var kafka = builder.AddKafka("kafka")
+    .WithDataVolume()
+    .WithKafkaUI();
+
 // Add API Service - endpoints will be created automatically from launch settings
 var apiService = builder.AddProject<Projects.SSBJr_DockSaaS_ApiService>("apiservice")
     .WithReference(docksaasdb)
     .WithReference(redis)
+    .WithReference(kafka)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
     .WithEnvironment("ServiceEndpoints__BaseUrl", "http://apiservice"); // Internal network name
 

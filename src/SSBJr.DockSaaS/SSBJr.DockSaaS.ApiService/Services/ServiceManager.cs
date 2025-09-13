@@ -10,6 +10,7 @@ public interface IServiceManager
     Task<ServiceInstance> CreateServiceInstanceAsync(ServiceInstance serviceInstance);
     Task<ServiceInstance> UpdateServiceInstanceAsync(ServiceInstance serviceInstance);
     Task<bool> DeleteServiceInstanceAsync(Guid serviceInstanceId);
+    Task<ServiceInstance?> GetServiceInstanceAsync(Guid serviceInstanceId, Guid userId);
     Task<string> GenerateEndpointUrlAsync(ServiceInstance serviceInstance);
     Task<string> GenerateApiKeyAsync(ServiceInstance serviceInstance);
     Task<bool> StartServiceAsync(Guid serviceInstanceId);
@@ -28,6 +29,29 @@ public class ServiceManager : IServiceManager
         _context = context;
         _logger = logger;
         _configuration = configuration;
+    }
+
+    public async Task<ServiceInstance?> GetServiceInstanceAsync(Guid serviceInstanceId, Guid userId)
+    {
+        try
+        {
+            // Get user to validate tenant access
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return null;
+
+            var serviceInstance = await _context.ServiceInstances
+                .Include(si => si.ServiceDefinition)
+                .Include(si => si.Tenant)
+                .FirstOrDefaultAsync(si => si.Id == serviceInstanceId && si.TenantId == user.TenantId);
+
+            return serviceInstance;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get service instance {ServiceInstanceId} for user {UserId}", serviceInstanceId, userId);
+            return null;
+        }
     }
 
     public async Task<ServiceInstance> CreateServiceInstanceAsync(ServiceInstance serviceInstance)

@@ -515,82 +515,247 @@ curl -X GET "https://localhost:7000/api/function/{tenant-id}/{service-id}/functi
 ### Get Cluster Information
 ```bash
 curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/cluster/info" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}"
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}"
 ```
 
-### Get Cluster Health
-```bash
-curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/cluster/health" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}"
+**Response:**
+```json
+{
+  "status": "healthy",
+  "connected": true,
+  "topicCount": 5,
+  "serviceId": "service-uuid",
+  "tenantId": "tenant-uuid",
+  "configuration": {
+    "partitions": 3,
+    "replicationFactor": 1,
+    "retentionHours": 168,
+    "compressionType": "snappy",
+    "securityProtocol": "PLAINTEXT"
+  }
+}
 ```
 
 ### List Topics
 ```bash
 curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}"
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}"
+```
+
+**Response:**
+```json
+[
+  {
+    "name": "user-events",
+    "partitions": 3,
+    "replicationFactor": 1
+  },
+  {
+    "name": "order-processing",
+    "partitions": 5,
+    "replicationFactor": 1
+  }
+]
 ```
 
 ### Create Topic
 ```bash
 curl -X POST "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "user-events",
-    "partitions": 6,
-    "replicationFactor": 1,
-    "retentionMs": 604800000,
-    "compressionType": "snappy",
-    "cleanupPolicy": "delete"
+    "name": "new-events",
+    "partitions": 3,
+    "replicationFactor": 1
   }'
 ```
 
-### Get Topic Details
-```bash
-curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}"
+**Response:**
+```json
+{
+  "name": "new-events",
+  "partitions": 3,
+  "replicationFactor": 1,
+  "created": true,
+  "createdAt": "2024-01-15T10:30:00Z"
+}
 ```
 
 ### Produce Message
 ```bash
 curl -X POST "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events/messages" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}" \
   -H "Content-Type: application/json" \
   -d '{
     "key": "user-123",
     "value": "{\"userId\": 123, \"action\": \"login\", \"timestamp\": \"2024-01-15T10:30:00Z\"}",
     "headers": {
-      "content-type": "application/json",
-      "source": "user-service"
+      "source": "web-app",
+      "version": "1.0"
     }
   }'
 ```
 
+**Response:**
+```json
+{
+  "topic": "user-events",
+  "key": "user-123",
+  "value": "{\"userId\": 123, \"action\": \"login\", \"timestamp\": \"2024-01-15T10:30:00Z\"}",
+  "headers": {
+    "source": "web-app",
+    "version": "1.0"
+  },
+  "produced": true,
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
 ### Consume Messages
 ```bash
-curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events/messages?consumerGroup=analytics&maxMessages=5&timeoutMs=10000" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}"
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events/messages?consumerGroup=analytics&maxMessages=10&timeoutSeconds=5" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}"
 ```
 
-### List Consumer Groups
-```bash
-curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/consumer-groups" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}"
+**Response:**
+```json
+[
+  {
+    "topic": "user-events",
+    "partition": 0,
+    "offset": 42,
+    "key": "user-123",
+    "value": "{\"userId\": 123, \"action\": \"login\", \"timestamp\": \"2024-01-15T10:30:00Z\"}",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "headers": {
+      "source": "web-app",
+      "version": "1.0"
+    }
+  }
+]
 ```
 
-### Delete Topic
+### Health Check do Kafka
 ```bash
-curl -X DELETE "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events" \
-  -H "Authorization: Bearer {your-jwt-token}" \
-  -H "X-API-Key: {service-api-key}"
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/health" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}"
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "connected": true,
+  "timestamp": "2024-01-15T10:30:00Z",
+  "serviceId": "service-uuid"
+}
+```
+
+### Informações de Tópico Específico
+```bash
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/user-events" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}"
+```
+
+**Response:**
+```json
+{
+  "name": "user-events",
+  "partitions": [
+    {
+      "partition": 0,
+      "leader": 1001,
+      "replicas": 1,
+      "isr": 1
+    },
+    {
+      "partition": 1,
+      "leader": 1001,
+      "replicas": 1,
+      "isr": 1
+    },
+    {
+      "partition": 2,
+      "leader": 1001,
+      "replicas": 1,
+      "isr": 1
+    }
+  ],
+  "partitionCount": 3,
+  "replicationFactor": 1
+}
+```
+
+### Deletar Tópico
+```bash
+curl -X DELETE "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/old-events" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}"
+```
+
+**Response:** `204 No Content`
+
+---
+
+## ?? Casos de Uso Kafka
+
+### 1. Real-time Analytics
+```bash
+# Produzir eventos de usuário
+curl -X POST "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/analytics-events/messages" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "page-view",
+    "value": "{\"page\": \"/dashboard\", \"userId\": 123, \"sessionId\": \"abc123\", \"timestamp\": \"2024-01-15T10:30:00Z\"}"
+  }'
+
+# Consumir para processamento em lote
+curl -X GET "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/analytics-events/messages?consumerGroup=batch-processor&maxMessages=100" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}"
+```
+
+### 2. Event Sourcing
+```bash
+# Armazenar eventos de domínio
+curl -X POST "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/domain-events/messages" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "order-123",
+    "value": "{\"eventType\": \"OrderCreated\", \"orderId\": 123, \"customerId\": 456, \"amount\": 99.99}",
+    "headers": {
+      "eventVersion": "1.0",
+      "aggregateType": "Order"
+    }
+  }'
+```
+
+### 3. Microservices Communication
+```bash
+# Publicar eventos entre serviços
+curl -X POST "https://localhost:7000/api/kafka/{tenant-id}/{service-id}/topics/service-events/messages" \
+  -H "Authorization: Bearer {jwt-token}" \
+  -H "X-API-Key: {kafka-api-key}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "user-service",
+    "value": "{\"eventType\": \"UserRegistered\", \"userId\": 789, \"email\": \"user@example.com\"}",
+    "headers": {
+      "source": "user-service",
+      "correlationId": "req-xyz789"
+    }
+  }'
 ```
 
 ---

@@ -96,19 +96,22 @@ Se encontrar erros de JSON deserialization:
         │                        │                        │
         └────────────────────────┼────────────────────────┘
                                  │
-                    ┌─────────────────┐
-                    │      Redis      │
-                    │    (Managed)    │
-                    └─────────────────┘
+        ┌─────────────────────────┼─────────────────────────┐
+        │                        │                         │
+    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+    │      Redis      │    │   Apache Kafka  │    │   Kafka UI      │
+    │    (Managed)    │    │   (Managed)     │    │   (Optional)    │
+    └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ### Comunicação de Rede Docker Interna
 
-Todos os serviços (API, Web, PostgreSQL, Redis) comunicam-se usando nomes de serviço Docker na rede interna:
+Todos os serviços (API, Web, PostgreSQL, Redis, Kafka) comunicam-se usando nomes de serviço Docker na rede interna:
 - API: `http://apiservice`
 - Web: `http://webservice`
 - PostgreSQL: `postgres`
 - Redis: `redis`
+- Kafka: `kafka`
 
 ## 📁 Estrutura do Projeto
 
@@ -151,6 +154,7 @@ SSBJr.DockSaaS/
 ### Variáveis de Ambiente
 - `ASPNETCORE_ENVIRONMENT`: Development/Staging/Production
 - `ConnectionStrings__docksaasdb`: String de conexão PostgreSQL
+- `ConnectionStrings__kafka`: String de conexão Kafka (gerenciado pelo Aspire)
 - `JwtSettings__Secret`: Chave secreta JWT
 - `JwtSettings__Issuer`: Emissor do token
 - `JwtSettings__Audience`: Audiência do token
@@ -161,6 +165,8 @@ SSBJr.DockSaaS/
 - **Web HTTPS**: 7001
 - **Web HTTP**: 5201
 - **Aspire Dashboard**: 17090
+- **Kafka**: 9092 (interno)
+- **Kafka UI**: Acessível via Aspire Dashboard
 
 ## 📊 Serviços Disponíveis
 
@@ -239,20 +245,29 @@ SSBJr.DockSaaS/
 - `POST /api/function/{tenant}/{service}/functions/{function}/invoke` - Invocar função
 - `PUT /api/function/{tenant}/{service}/functions/{function}/code` - Atualizar código
 
-### 6. 🔄 Apache Kafka
+### 6. 🔄 Apache Kafka (Gerenciado pelo Aspire)
 **Funcionalidades:**
-- Plataforma de streaming distribuída
-- Gerenciamento de tópicos e partições
-- Produção/consumo de mensagens
-- Schema Registry integrado
+- Plataforma de streaming distribuída totalmente gerenciada
+- Gerenciamento automático de tópicos e partições
+- Produção/consumo de mensagens via API
+- Schema Registry integrado (opcional)
 - Kafka Connect (opcional)
 - Monitoramento de saúde do cluster
+- **Interface Kafka UI** para visualização via Aspire Dashboard
 
 **APIs Principais:**
 - `GET /api/kafka/{tenant}/{service}/cluster/info` - Informações do cluster
 - `GET /api/kafka/{tenant}/{service}/topics` - Listar tópicos
 - `POST /api/kafka/{tenant}/{service}/topics` - Criar tópico
 - `POST /api/kafka/{tenant}/{service}/topics/{topic}/messages` - Produzir mensagem
+- `GET /api/kafka/{tenant}/{service}/topics/{topic}/messages` - Consumir mensagens
+- `GET /api/kafka/{tenant}/{service}/health` - Status de saúde do Kafka
+
+**Configurações Avançadas:**
+- Configuração automática pelo Aspire
+- Volumes persistentes de dados
+- Interface web Kafka UI incluída
+- Conexão segura via service discovery
 
 ## 👥 Gerenciamento de Usuários
 
@@ -381,6 +396,7 @@ dotnet test SSBJr.DockSaaS.Tests
 - `scripts/apply-migrations.ps1`: Aplicar migrações do banco
 - `scripts/troubleshoot-login.ps1`: Diagnóstico de problemas
 - `scripts/test-api-health.ps1`: Teste de conectividade da API
+- `scripts/test-kafka-integration.ps1`: Teste de integração Kafka
 
 ## 🔧 Requisitos Técnicos
 
@@ -455,6 +471,9 @@ dotnet test SSBJr.DockSaaS.Tests
 
 # Teste de conectividade da API
 .\scripts\test-api-health.ps1
+
+# Teste de integração Kafka
+.\scripts\test-kafka-integration.ps1
 ```
 
 ### Postman Testing

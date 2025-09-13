@@ -1,487 +1,410 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using SSBJr.DockSaaS.ApiService.Data;
+using SSBJr.DockSaaS.ApiService.Services;
+using SSBJr.DockSaaS.ApiService.DTOs;
+using System.Security.Claims;
 using SSBJr.DockSaaS.ApiService.Models;
-using System.Text.Json;
 
 namespace SSBJr.DockSaaS.ApiService.Controllers;
 
 [ApiController]
-[Route("api/kafka/{tenantId:guid}/{serviceId:guid}")]
+[Route("api/kafka")]
 [Authorize]
 public class KafkaController : ControllerBase
 {
-    private readonly DockSaaSDbContext _context;
+    private readonly IKafkaManagementService _kafkaService;
+    private readonly IServiceManager _serviceManager;
     private readonly ILogger<KafkaController> _logger;
 
-    public KafkaController(DockSaaSDbContext context, ILogger<KafkaController> logger)
+    public KafkaController(
+        IKafkaManagementService kafkaService,
+        IServiceManager serviceManager,
+        ILogger<KafkaController> logger)
     {
-        _context = context;
+        _kafkaService = kafkaService;
+        _serviceManager = serviceManager;
         _logger = logger;
     }
 
-    [HttpGet("topics")]
-    public async Task<ActionResult<KafkaTopicsResponse>> GetTopics()
+    /// <summary>
+    /// Get Kafka cluster information
+    /// </summary>
+    [HttpGet("{tenantId}/{serviceId}/cluster/info")]
+    public async Task<ActionResult<object>> GetClusterInfo(Guid tenantId, Guid serviceId)
     {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
         try
         {
-            // Simulate getting topics from Kafka cluster
-            var topics = new List<KafkaTopic>
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            
+            // Validate service access
+            var serviceInstance = await _serviceManager.GetServiceInstanceAsync(serviceId, userId);
+            if (serviceInstance == null || serviceInstance.TenantId != tenantId)
             {
-                new() { Name = "events", Partitions = 3, ReplicationFactor = 1, RetentionMs = 604800000 },
-                new() { Name = "logs", Partitions = 5, ReplicationFactor = 1, RetentionMs = 259200000 },
-                new() { Name = "notifications", Partitions = 2, ReplicationFactor = 1, RetentionMs = 86400000 },
-                new() { Name = "metrics", Partitions = 8, ReplicationFactor = 1, RetentionMs = 604800000 }
-            };
-
-            var response = new KafkaTopicsResponse
-            {
-                Topics = topics,
-                TotalTopics = topics.Count
-            };
-
-            return Ok(response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get topics for Kafka service {ServiceId}", serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to retrieve topics" });
-        }
-    }
-
-    [HttpPost("topics")]
-    public async Task<ActionResult<KafkaTopic>> CreateTopic([FromBody] CreateTopicRequest request)
-    {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
-        try
-        {
-            // Validate topic name
-            if (string.IsNullOrEmpty(request.Name) || request.Name.Length > 249)
-                return BadRequest(new { error = "Topic name must be between 1 and 249 characters" });
-
-            // Simulate creating topic in Kafka cluster
-            var topic = new KafkaTopic
-            {
-                Name = request.Name,
-                Partitions = request.Partitions ?? 3,
-                ReplicationFactor = request.ReplicationFactor ?? 1,
-                RetentionMs = request.RetentionMs ?? 604800000, // 7 days default
-                CompressionType = request.CompressionType ?? "snappy",
-                CleanupPolicy = request.CleanupPolicy ?? "delete"
-            };
-
-            _logger.LogInformation("Created topic {TopicName} for Kafka service {ServiceId}", 
-                topic.Name, serviceInstance.Id);
-
-            return CreatedAtAction(nameof(GetTopic), new { topicName = topic.Name }, topic);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create topic for Kafka service {ServiceId}", serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to create topic" });
-        }
-    }
-
-    [HttpGet("topics/{topicName}")]
-    public async Task<ActionResult<KafkaTopic>> GetTopic(string topicName)
-    {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
-        try
-        {
-            // Simulate getting topic details from Kafka cluster
-            var topic = new KafkaTopic
-            {
-                Name = topicName,
-                Partitions = 3,
-                ReplicationFactor = 1,
-                RetentionMs = 604800000,
-                CompressionType = "snappy",
-                CleanupPolicy = "delete",
-                TotalMessages = new Random().NextInt64(10000, 1000000),
-                TotalSizeBytes = new Random().NextInt64(1024 * 1024, 1024L * 1024 * 1024 * 5)
-            };
-
-            return Ok(topic);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get topic {TopicName} for Kafka service {ServiceId}", 
-                topicName, serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to retrieve topic" });
-        }
-    }
-
-    [HttpDelete("topics/{topicName}")]
-    public async Task<IActionResult> DeleteTopic(string topicName)
-    {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
-        try
-        {
-            // Simulate deleting topic from Kafka cluster
-            _logger.LogInformation("Deleted topic {TopicName} from Kafka service {ServiceId}", 
-                topicName, serviceInstance.Id);
-
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to delete topic {TopicName} for Kafka service {ServiceId}", 
-                topicName, serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to delete topic" });
-        }
-    }
-
-    [HttpPost("topics/{topicName}/messages")]
-    public async Task<ActionResult<ProduceMessageResponse>> ProduceMessage(string topicName, [FromBody] ProduceMessageRequest request)
-    {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
-        try
-        {
-            // Simulate producing message to Kafka topic
-            var messageId = Guid.NewGuid().ToString();
-            var offset = new Random().NextInt64(1000000);
-            var partition = new Random().Next(0, 3); // Assuming 3 partitions
-
-            var response = new ProduceMessageResponse
-            {
-                MessageId = messageId,
-                Topic = topicName,
-                Partition = partition,
-                Offset = offset,
-                Timestamp = DateTime.UtcNow
-            };
-
-            _logger.LogDebug("Produced message {MessageId} to topic {TopicName} for Kafka service {ServiceId}", 
-                messageId, topicName, serviceInstance.Id);
-
-            return Ok(response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to produce message to topic {TopicName} for Kafka service {ServiceId}", 
-                topicName, serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to produce message" });
-        }
-    }
-
-    [HttpGet("topics/{topicName}/messages")]
-    public async Task<ActionResult<ConsumeMessagesResponse>> ConsumeMessages(
-        string topicName, 
-        [FromQuery] string? consumerGroup = null,
-        [FromQuery] int maxMessages = 10,
-        [FromQuery] int timeoutMs = 5000)
-    {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
-        try
-        {
-            // Simulate consuming messages from Kafka topic
-            var messages = new List<KafkaMessage>();
-            var messageCount = new Random().Next(0, Math.Min(maxMessages, 20));
-
-            for (int i = 0; i < messageCount; i++)
-            {
-                messages.Add(new KafkaMessage
-                {
-                    Key = $"key-{i}",
-                    Value = $"{{\"id\": {i}, \"message\": \"Sample message {i}\", \"timestamp\": \"{DateTime.UtcNow:O}\"}}",
-                    Topic = topicName,
-                    Partition = new Random().Next(0, 3),
-                    Offset = new Random().NextInt64(1000000) + i,
-                    Timestamp = DateTime.UtcNow.AddSeconds(-i * 10),
-                    Headers = new Dictionary<string, string>
-                    {
-                        ["content-type"] = "application/json",
-                        ["source"] = "kafka-api"
-                    }
-                });
+                return NotFound("Service instance not found or access denied.");
             }
 
-            var response = new ConsumeMessagesResponse
+            // Test connection
+            var isConnected = await _kafkaService.TestConnectionAsync();
+            if (!isConnected)
             {
-                Messages = messages,
-                ConsumerGroup = consumerGroup ?? "default-consumer-group",
-                Topic = topicName,
-                MessageCount = messages.Count
+                return StatusCode(503, new { error = "Kafka cluster is not available" });
+            }
+
+            // Get topics list for cluster info
+            var topics = await _kafkaService.ListTopicsAsync();
+
+            var clusterInfo = new
+            {
+                status = "healthy",
+                connected = true,
+                topicCount = topics.Count,
+                serviceId = serviceId,
+                tenantId = tenantId,
+                configuration = serviceInstance.Configuration
             };
 
-            return Ok(response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to consume messages from topic {TopicName} for Kafka service {ServiceId}", 
-                topicName, serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to consume messages" });
-        }
-    }
-
-    [HttpGet("consumer-groups")]
-    public async Task<ActionResult<ConsumerGroupsResponse>> GetConsumerGroups()
-    {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
-        try
-        {
-            // Simulate getting consumer groups from Kafka cluster
-            var consumerGroups = new List<ConsumerGroup>
-            {
-                new() 
-                { 
-                    GroupId = "analytics-group", 
-                    State = "Stable", 
-                    Members = 3,
-                    Lag = new Random().Next(0, 1000)
-                },
-                new() 
-                { 
-                    GroupId = "logging-group", 
-                    State = "Stable", 
-                    Members = 2,
-                    Lag = new Random().Next(0, 500)
-                },
-                new() 
-                { 
-                    GroupId = "monitoring-group", 
-                    State = "Rebalancing", 
-                    Members = 1,
-                    Lag = new Random().Next(0, 2000)
-                }
-            };
-
-            var response = new ConsumerGroupsResponse
-            {
-                ConsumerGroups = consumerGroups,
-                TotalGroups = consumerGroups.Count
-            };
-
-            return Ok(response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get consumer groups for Kafka service {ServiceId}", serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to retrieve consumer groups" });
-        }
-    }
-
-    [HttpGet("cluster/info")]
-    public async Task<ActionResult<KafkaClusterInfo>> GetClusterInfo()
-    {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
-        try
-        {
-            var clusterInfo = new KafkaClusterInfo
-            {
-                ClusterId = $"kafka-cluster-{serviceInstance.TenantId}",
-                Brokers = new List<KafkaBroker>
-                {
-                    new() { Id = 0, Host = "broker-0", Port = 9092, Rack = "rack-a" },
-                    new() { Id = 1, Host = "broker-1", Port = 9092, Rack = "rack-b" },
-                    new() { Id = 2, Host = "broker-2", Port = 9092, Rack = "rack-c" }
-                },
-                Controller = 0,
-                Version = "3.6.0"
-            };
-
+            _logger.LogInformation("Cluster info retrieved for service {ServiceId}", serviceId);
             return Ok(clusterInfo);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get cluster info for Kafka service {ServiceId}", serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to retrieve cluster info" });
+            _logger.LogError(ex, "Error getting cluster info for service {ServiceId}", serviceId);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
         }
     }
 
-    [HttpGet("cluster/health")]
-    public async Task<ActionResult<KafkaClusterHealth>> GetClusterHealth()
+    /// <summary>
+    /// List all topics in the Kafka cluster
+    /// </summary>
+    [HttpGet("{tenantId}/{serviceId}/topics")]
+    public async Task<ActionResult<List<object>>> ListTopics(Guid tenantId, Guid serviceId)
     {
-        var (serviceInstance, error) = await ValidateServiceInstanceAsync();
-        if (error != null) return error;
-
         try
         {
-            var random = new Random();
-            var health = new KafkaClusterHealth
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            
+            // Validate service access
+            var serviceInstance = await _serviceManager.GetServiceInstanceAsync(serviceId, userId);
+            if (serviceInstance == null || serviceInstance.TenantId != tenantId)
             {
-                ClusterId = $"kafka-cluster-{serviceInstance.TenantId}",
-                Status = "Healthy",
-                BrokerCount = 3,
-                OnlineBrokers = 3,
-                TopicCount = random.Next(5, 50),
-                PartitionCount = random.Next(15, 150),
-                ConsumerGroupCount = random.Next(2, 20),
-                UnderReplicatedPartitions = random.Next(0, 2),
-                OfflinePartitions = random.Next(0, 1),
-                LastChecked = DateTime.UtcNow,
-                Metrics = new Dictionary<string, double>
-                {
-                    ["message_rate"] = random.Next(100, 10000),
-                    ["byte_rate"] = random.Next(1024, 1024 * 1024 * 10),
-                    ["network_request_rate"] = random.Next(50, 5000),
-                    ["cpu_utilization"] = random.NextDouble() * 100,
-                    ["memory_utilization"] = random.NextDouble() * 100,
-                    ["disk_utilization"] = random.NextDouble() * 80
-                }
-            };
+                return NotFound("Service instance not found or access denied.");
+            }
 
-            return Ok(health);
+            var topics = await _kafkaService.ListTopicsAsync();
+            
+            var topicDetails = new List<object>();
+            foreach (var topicName in topics)
+            {
+                var topicInfo = await _kafkaService.GetTopicInfoAsync(topicName);
+                topicDetails.Add(new
+                {
+                    name = topicName,
+                    partitions = topicInfo?.Partitions?.Count ?? 0,
+                    replicationFactor = topicInfo?.Partitions?.FirstOrDefault()?.Replicas?.Length ?? 0
+                });
+            }
+
+            _logger.LogInformation("Listed {TopicCount} topics for service {ServiceId}", topics.Count, serviceId);
+            return Ok(topicDetails);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get cluster health for Kafka service {ServiceId}", serviceInstance.Id);
-            return StatusCode(500, new { error = "Failed to retrieve cluster health" });
+            _logger.LogError(ex, "Error listing topics for service {ServiceId}", serviceId);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
         }
     }
 
-    private async Task<(ServiceInstance serviceInstance, ActionResult? error)> ValidateServiceInstanceAsync()
+    /// <summary>
+    /// Create a new Kafka topic
+    /// </summary>
+    [HttpPost("{tenantId}/{serviceId}/topics")]
+    public async Task<ActionResult<object>> CreateTopic(Guid tenantId, Guid serviceId, [FromBody] CreateTopicRequest request)
     {
-        var tenantId = Guid.Parse(RouteData.Values["tenantId"]!.ToString()!);
-        var serviceId = Guid.Parse(RouteData.Values["serviceId"]!.ToString()!);
+        try
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            
+            // Validate service access
+            var serviceInstance = await _serviceManager.GetServiceInstanceAsync(serviceId, userId);
+            if (serviceInstance == null || serviceInstance.TenantId != tenantId)
+            {
+                return NotFound("Service instance not found or access denied.");
+            }
 
-        var serviceInstance = await _context.ServiceInstances
-            .Include(s => s.ServiceDefinition)
-            .Include(s => s.Tenant)
-            .FirstOrDefaultAsync(s => s.Id == serviceId && s.TenantId == tenantId);
+            // Validate request
+            if (string.IsNullOrEmpty(request.Name))
+            {
+                return BadRequest("Topic name is required.");
+            }
 
-        if (serviceInstance == null)
-            return (null!, NotFound(new { error = "Service instance not found" }));
+            if (request.Partitions <= 0)
+            {
+                request.Partitions = 3; // Default
+            }
 
-        if (serviceInstance.ServiceDefinition.Type != "Kafka")
-            return (null!, BadRequest(new { error = "Service is not a Kafka cluster" }));
+            if (request.ReplicationFactor <= 0)
+            {
+                request.ReplicationFactor = 1; // Default for single-node setup
+            }
 
-        if (serviceInstance.Status != "Running")
-            return (null!, BadRequest(new { error = "Kafka cluster is not running" }));
+            var success = await _kafkaService.CreateTopicAsync(request.Name, request.Partitions, (short)request.ReplicationFactor);
+            
+            if (success)
+            {
+                var response = new
+                {
+                    name = request.Name,
+                    partitions = request.Partitions,
+                    replicationFactor = request.ReplicationFactor,
+                    created = true,
+                    createdAt = DateTime.UtcNow
+                };
 
-        // Verify API key if provided
-        var apiKey = Request.Headers["X-API-Key"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(apiKey) && apiKey != serviceInstance.ApiKey)
-            return (null!, Unauthorized(new { error = "Invalid API key" }));
+                _logger.LogInformation("Topic {TopicName} created successfully for service {ServiceId}", request.Name, serviceId);
+                return CreatedAtAction(nameof(GetTopicInfo), new { tenantId, serviceId, topicName = request.Name }, response);
+            }
+            else
+            {
+                return BadRequest(new { error = "Failed to create topic" });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating topic {TopicName} for service {ServiceId}", request.Name, serviceId);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
 
-        return (serviceInstance, null);
+    /// <summary>
+    /// Get information about a specific topic
+    /// </summary>
+    [HttpGet("{tenantId}/{serviceId}/topics/{topicName}")]
+    public async Task<ActionResult<object>> GetTopicInfo(Guid tenantId, Guid serviceId, string topicName)
+    {
+        try
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            
+            // Validate service access
+            var serviceInstance = await _serviceManager.GetServiceInstanceAsync(serviceId, userId);
+            if (serviceInstance == null || serviceInstance.TenantId != tenantId)
+            {
+                return NotFound("Service instance not found or access denied.");
+            }
+
+            var topicInfo = await _kafkaService.GetTopicInfoAsync(topicName);
+            if (topicInfo == null)
+            {
+                return NotFound($"Topic '{topicName}' not found.");
+            }
+
+            var response = new
+            {
+                name = topicInfo.Topic,
+                partitions = topicInfo.Partitions.Select(p => new
+                {
+                    partition = p.PartitionId,
+                    leader = p.Leader,
+                    replicas = p.Replicas?.Length ?? 0,
+                    isr = p.InSyncReplicas?.Length ?? 0
+                }).ToList(),
+                partitionCount = topicInfo.Partitions.Count,
+                replicationFactor = topicInfo.Partitions.FirstOrDefault()?.Replicas?.Length ?? 0
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting topic info for {TopicName} in service {ServiceId}", topicName, serviceId);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Delete a topic
+    /// </summary>
+    [HttpDelete("{tenantId}/{serviceId}/topics/{topicName}")]
+    public async Task<ActionResult> DeleteTopic(Guid tenantId, Guid serviceId, string topicName)
+    {
+        try
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            
+            // Validate service access
+            var serviceInstance = await _serviceManager.GetServiceInstanceAsync(serviceId, userId);
+            if (serviceInstance == null || serviceInstance.TenantId != tenantId)
+            {
+                return NotFound("Service instance not found or access denied.");
+            }
+
+            var success = await _kafkaService.DeleteTopicAsync(topicName);
+            
+            if (success)
+            {
+                _logger.LogInformation("Topic {TopicName} deleted successfully for service {ServiceId}", topicName, serviceId);
+                return NoContent();
+            }
+            else
+            {
+                return BadRequest(new { error = "Failed to delete topic" });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting topic {TopicName} for service {ServiceId}", topicName, serviceId);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Produce a message to a topic
+    /// </summary>
+    [HttpPost("{tenantId}/{serviceId}/topics/{topicName}/messages")]
+    public async Task<ActionResult<object>> ProduceMessage(Guid tenantId, Guid serviceId, string topicName, [FromBody] ProduceMessageRequest request)
+    {
+        try
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            
+            // Validate service access
+            var serviceInstance = await _serviceManager.GetServiceInstanceAsync(serviceId, userId);
+            if (serviceInstance == null || serviceInstance.TenantId != tenantId)
+            {
+                return NotFound("Service instance not found or access denied.");
+            }
+
+            // Validate request
+            if (string.IsNullOrEmpty(request.Value))
+            {
+                return BadRequest("Message value is required.");
+            }
+
+            var success = await _kafkaService.ProduceMessageAsync(topicName, request.Key, request.Value, request.Headers);
+            
+            if (success)
+            {
+                var response = new
+                {
+                    topic = topicName,
+                    key = request.Key,
+                    value = request.Value,
+                    headers = request.Headers,
+                    produced = true,
+                    timestamp = DateTime.UtcNow
+                };
+
+                _logger.LogInformation("Message produced to topic {TopicName} for service {ServiceId}", topicName, serviceId);
+                return Ok(response);
+            }
+            else
+            {
+                return BadRequest(new { error = "Failed to produce message" });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error producing message to topic {TopicName} for service {ServiceId}", topicName, serviceId);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Consume messages from a topic
+    /// </summary>
+    [HttpGet("{tenantId}/{serviceId}/topics/{topicName}/messages")]
+    public async Task<ActionResult<List<object>>> ConsumeMessages(Guid tenantId, Guid serviceId, string topicName, [FromQuery] string consumerGroup = "docksaas-consumer", [FromQuery] int maxMessages = 10, [FromQuery] int timeoutSeconds = 5)
+    {
+        try
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            
+            // Validate service access
+            var serviceInstance = await _serviceManager.GetServiceInstanceAsync(serviceId, userId);
+            if (serviceInstance == null || serviceInstance.TenantId != tenantId)
+            {
+                return NotFound("Service instance not found or access denied.");
+            }
+
+            var timeout = TimeSpan.FromSeconds(Math.Max(1, Math.Min(30, timeoutSeconds))); // Limit between 1-30 seconds
+            var messages = await _kafkaService.ConsumeMessagesAsync(topicName, consumerGroup, maxMessages, timeout);
+            
+            var response = messages.Select(m => new
+            {
+                topic = m.Topic,
+                partition = m.Partition.Value,
+                offset = m.Offset.Value,
+                key = m.Message.Key,
+                value = m.Message.Value,
+                timestamp = m.Message.Timestamp.UtcDateTime,
+                headers = m.Message.Headers?.ToDictionary(h => h.Key, h => System.Text.Encoding.UTF8.GetString(h.GetValueBytes()))
+            }).ToList();
+
+            _logger.LogInformation("Consumed {MessageCount} messages from topic {TopicName} for service {ServiceId}", messages.Count, topicName, serviceId);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error consuming messages from topic {TopicName} for service {ServiceId}", topicName, serviceId);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Test Kafka connection
+    /// </summary>
+    [HttpGet("{tenantId}/{serviceId}/health")]
+    public async Task<ActionResult<object>> HealthCheck(Guid tenantId, Guid serviceId)
+    {
+        try
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            
+            // Validate service access
+            var serviceInstance = await _serviceManager.GetServiceInstanceAsync(serviceId, userId);
+            if (serviceInstance == null || serviceInstance.TenantId != tenantId)
+            {
+                return NotFound("Service instance not found or access denied.");
+            }
+
+            var isHealthy = await _kafkaService.TestConnectionAsync();
+            
+            var response = new
+            {
+                status = isHealthy ? "healthy" : "unhealthy",
+                connected = isHealthy,
+                timestamp = DateTime.UtcNow,
+                serviceId = serviceId
+            };
+
+            if (isHealthy)
+            {
+                return Ok(response);
+            }
+            else
+            {
+                return StatusCode(503, response);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking Kafka health for service {ServiceId}", serviceId);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
     }
 }
 
-// Kafka DTOs
-public class KafkaTopicsResponse
-{
-    public List<KafkaTopic> Topics { get; set; } = new();
-    public int TotalTopics { get; set; }
-}
-
-public class KafkaTopic
-{
-    public string Name { get; set; } = "";
-    public int Partitions { get; set; }
-    public int ReplicationFactor { get; set; }
-    public long RetentionMs { get; set; }
-    public string CompressionType { get; set; } = "";
-    public string CleanupPolicy { get; set; } = "";
-    public long? TotalMessages { get; set; }
-    public long? TotalSizeBytes { get; set; }
-}
-
+// DTOs for Kafka operations
 public class CreateTopicRequest
 {
     public string Name { get; set; } = "";
-    public int? Partitions { get; set; }
-    public int? ReplicationFactor { get; set; }
-    public long? RetentionMs { get; set; }
-    public string? CompressionType { get; set; }
-    public string? CleanupPolicy { get; set; }
+    public int Partitions { get; set; } = 3;
+    public int ReplicationFactor { get; set; } = 1;
 }
 
 public class ProduceMessageRequest
 {
-    public string? Key { get; set; }
+    public string Key { get; set; } = "";
     public string Value { get; set; } = "";
     public Dictionary<string, string>? Headers { get; set; }
-    public int? Partition { get; set; }
-}
-
-public class ProduceMessageResponse
-{
-    public string MessageId { get; set; } = "";
-    public string Topic { get; set; } = "";
-    public int Partition { get; set; }
-    public long Offset { get; set; }
-    public DateTime Timestamp { get; set; }
-}
-
-public class KafkaMessage
-{
-    public string? Key { get; set; }
-    public string Value { get; set; } = "";
-    public string Topic { get; set; } = "";
-    public int Partition { get; set; }
-    public long Offset { get; set; }
-    public DateTime Timestamp { get; set; }
-    public Dictionary<string, string>? Headers { get; set; }
-}
-
-public class ConsumeMessagesResponse
-{
-    public List<KafkaMessage> Messages { get; set; } = new();
-    public string ConsumerGroup { get; set; } = "";
-    public string Topic { get; set; } = "";
-    public int MessageCount { get; set; }
-}
-
-public class ConsumerGroupsResponse
-{
-    public List<ConsumerGroup> ConsumerGroups { get; set; } = new();
-    public int TotalGroups { get; set; }
-}
-
-public class ConsumerGroup
-{
-    public string GroupId { get; set; } = "";
-    public string State { get; set; } = "";
-    public int Members { get; set; }
-    public long Lag { get; set; }
-}
-
-public class KafkaClusterInfo
-{
-    public string ClusterId { get; set; } = "";
-    public List<KafkaBroker> Brokers { get; set; } = new();
-    public int Controller { get; set; }
-    public string Version { get; set; } = "";
-}
-
-public class KafkaBroker
-{
-    public int Id { get; set; }
-    public string Host { get; set; } = "";
-    public int Port { get; set; }
-    public string? Rack { get; set; }
-}
-
-public class KafkaClusterHealth
-{
-    public string ClusterId { get; set; } = "";
-    public string Status { get; set; } = "";
-    public int BrokerCount { get; set; }
-    public int OnlineBrokers { get; set; }
-    public int TopicCount { get; set; }
-    public int PartitionCount { get; set; }
-    public int ConsumerGroupCount { get; set; }
-    public int UnderReplicatedPartitions { get; set; }
-    public int OfflinePartitions { get; set; }
-    public DateTime LastChecked { get; set; }
-    public Dictionary<string, double> Metrics { get; set; } = new();
 }
