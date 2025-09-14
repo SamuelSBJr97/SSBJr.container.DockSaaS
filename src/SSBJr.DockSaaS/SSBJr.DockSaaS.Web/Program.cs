@@ -6,6 +6,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Blazored.LocalStorage;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,8 +19,30 @@ builder.Services.AddRazorComponents()
 
 // Configure authentication
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddAuthentication("Cookies")
-    .AddCookie("Cookies");
+
+// Use JWT authentication instead of cookies for API consistency
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        // JWT options will be configured by the CustomAuthenticationStateProvider
+        options.RequireHttpsMetadata = false; // Allow HTTP in development
+        options.SaveToken = true;
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                // For Blazor Server, we'll handle JWT via custom provider
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                context.HttpContext.RequestServices.GetService<ILogger<Program>>()?
+                    .LogDebug("JWT authentication failed: {Error}", context.Exception.Message);
+                return Task.CompletedTask;
+            }
+        };
+    });
+
 builder.Services.AddAuthorization();
 
 // Register application services

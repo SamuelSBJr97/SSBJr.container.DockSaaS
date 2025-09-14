@@ -19,6 +19,21 @@ public class ApiClient
         _localStorage = localStorage;
         _logger = logger;
         _jsRuntime = jsRuntime;
+        
+        // Initialize the authorization header on startup
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1000); // Wait a moment for the app to fully initialize
+                await SetAuthorizationHeaderAsync();
+                _logger.LogDebug("ApiClient initialization completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Error during ApiClient initialization (expected during prerendering)");
+            }
+        });
     }
 
     private async Task<bool> IsJavaScriptAvailableAsync()
@@ -54,8 +69,23 @@ public class ApiClient
             var token = await _localStorage.GetItemAsync<string>("authToken");
             if (!string.IsNullOrEmpty(token))
             {
+                // Verify token hasn't expired
+                var expiry = await _localStorage.GetItemAsync<DateTime>("tokenExpiry");
+                if (expiry != default && expiry <= DateTime.UtcNow)
+                {
+                    _logger.LogDebug("Token expired, clearing authorization header");
+                    _httpClient.DefaultRequestHeaders.Authorization = null;
+                    
+                    // Clear expired tokens from storage
+                    await _localStorage.RemoveItemAsync("authToken");
+                    await _localStorage.RemoveItemAsync("tokenExpiry");
+                    await _localStorage.RemoveItemAsync("refreshToken");
+                    await _localStorage.RemoveItemAsync("currentUser");
+                    return;
+                }
+
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                _logger.LogDebug("Authorization header set with token");
+                _logger.LogDebug("Authorization header set with valid token (expires: {Expiry})", expiry);
             }
             else
             {
@@ -364,13 +394,30 @@ public class ApiClient
     /// </summary>
     public void SetAuthorizationToken(string? token)
     {
-        if (!string.IsNullOrEmpty(token))
+        try
         {
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            if (!string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                _logger.LogDebug("Authorization token manually set");
+            }
+            else
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = null;
+                _logger.LogDebug("Authorization token manually cleared");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            _httpClient.DefaultRequestHeaders.Authorization = null;
+            _logger.LogError(ex, "Error setting authorization token manually");
         }
+    }
+
+    /// <summary>
+    /// Force refresh authorization header from localStorage
+    /// </summary>
+    public async Task RefreshAuthorizationAsync()
+    {
+        await SetAuthorizationHeaderAsync();
     }
 }

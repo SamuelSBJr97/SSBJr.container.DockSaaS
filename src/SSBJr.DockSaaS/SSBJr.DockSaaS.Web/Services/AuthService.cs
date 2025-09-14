@@ -54,6 +54,12 @@ public class AuthService : IAuthService
 
                 // Update API client with new token
                 _apiClient.SetAuthorizationToken(response.Token);
+                
+                // Force refresh authorization header to ensure it's properly set
+                if (_apiClient is ApiClient apiClient)
+                {
+                    await apiClient.RefreshAuthorizationAsync();
+                }
 
                 _logger.LogInformation("Authentication data stored successfully for user: {Email}", request.Email);
                 return true;
@@ -92,6 +98,12 @@ public class AuthService : IAuthService
 
                 // Update API client with new token
                 _apiClient.SetAuthorizationToken(response.Token);
+
+                // Force refresh authorization header to ensure it's properly set
+                if (_apiClient is ApiClient apiClient)
+                {
+                    await apiClient.RefreshAuthorizationAsync();
+                }
 
                 _logger.LogInformation("Authentication data stored successfully for new user: {Email}", request.Email);
                 return true;
@@ -229,6 +241,12 @@ public class AuthService : IAuthService
 
                 // Update API client with new token
                 _apiClient.SetAuthorizationToken(response.Token);
+
+                // Force refresh authorization header to ensure it's properly set
+                if (_apiClient is ApiClient apiClient)
+                {
+                    await apiClient.RefreshAuthorizationAsync();
+                }
 
                 // Refresh authentication state
                 if (_authStateProvider is CustomAuthenticationStateProvider customProvider)
